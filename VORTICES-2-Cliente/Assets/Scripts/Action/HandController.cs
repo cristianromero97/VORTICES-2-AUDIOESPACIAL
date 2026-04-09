@@ -30,15 +30,29 @@ public class HandController : MonoBehaviour
             return;
         }
 
-        bPress.action.started += OpenChat;
-        aPress.action.started += SelectElement;
+        if (bPress.action != null)
+        {
+            bPress.action.started += OpenChat;
+        }
+
+        if (aPress.action != null)
+        {
+            aPress.action.started += SelectElement;
+        }
 
     }
 
     private void OnDisable()
     {
-        aPress.action.started -= SelectElement;
-        bPress.action.started -= OpenChat;
+        if (aPress.action != null)
+        {
+            aPress.action.started -= SelectElement;
+        }
+
+        if (bPress.action != null)
+        {
+            bPress.action.started -= OpenChat;
+        }
 
     }
 
