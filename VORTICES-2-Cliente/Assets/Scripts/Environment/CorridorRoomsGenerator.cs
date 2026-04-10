@@ -1,7 +1,25 @@
 using UnityEngine;
+using System.Collections.Generic;
 
 public class CorridorRoomsGenerator : MonoBehaviour
 {
+    [System.Serializable]
+    private class FurniturePlacement
+    {
+        public string id = "Furniture";
+        public GameObject prefab;
+        public Vector3 localPosition = Vector3.zero;
+        public Vector3 localEulerAngles = Vector3.zero;
+        public Vector3 localScale = Vector3.one;
+        public string placeOnTopOfId = string.Empty;
+        [Min(0f)] public float topOffset = 0.02f;
+        public bool useSpecificRooms = false;
+        public List<int> specificRoomIndices = new List<int>();
+        [Min(1)] public int placeEveryNRooms = 1;
+        public bool placeOnLeftRooms = true;
+        public bool placeOnRightRooms = true;
+    }
+
     [Header("Generation")]
     [SerializeField] private bool generateOnStart = false;
     [SerializeField] private bool clearBeforeGenerate = true;
@@ -33,6 +51,10 @@ public class CorridorRoomsGenerator : MonoBehaviour
     [SerializeField] private Material roomFloorMaterial;
     [SerializeField] private Material roomWallMaterial;
     [SerializeField] private Material roomCeilingMaterial;
+
+    [Header("Furniture")]
+    [SerializeField] private bool generateFurniture = true;
+    [SerializeField] private List<FurniturePlacement> furniturePlacements = new List<FurniturePlacement>();
 
     private const string GeneratedRootName = "GeneratedScenario";
 
@@ -215,6 +237,162 @@ public class CorridorRoomsGenerator : MonoBehaviour
             doorwayWidth,
             doorwayHeight,
             roomWallMaterial);
+
+        if (generateFurniture)
+        {
+            PlaceFurnitureInRoom(roomRoot.transform, index, side, xCenter, zCenter);
+        }
+    }
+
+    private void PlaceFurnitureInRoom(Transform roomRoot, int roomIndex, int side, float roomCenterX, float roomCenterZ)
+    {
+        if (furniturePlacements == null || furniturePlacements.Count == 0)
+        {
+            return;
+        }
+
+        Transform furnitureRoot = new GameObject("Furniture").transform;
+        furnitureRoot.SetParent(roomRoot, false);
+        furnitureRoot.localPosition = new Vector3(roomCenterX, 0f, roomCenterZ);
+
+        Dictionary<string, GameObject> placedById = new Dictionary<string, GameObject>();
+        List<FurniturePlacement> placeOnTopQueue = new List<FurniturePlacement>();
+
+        foreach (FurniturePlacement placement in furniturePlacements)
+        {
+            if (placement == null || placement.prefab == null)
+            {
+                continue;
+            }
+
+            if (!ShouldPlaceInRoom(placement, roomIndex, side))
+            {
+                continue;
+            }
+
+            if (!string.IsNullOrWhiteSpace(placement.placeOnTopOfId))
+            {
+                placeOnTopQueue.Add(placement);
+                continue;
+            }
+
+            PlaceFurnitureInstance(placement, furnitureRoot, roomIndex, placedById);
+        }
+
+        foreach (FurniturePlacement placement in placeOnTopQueue)
+        {
+            GameObject instance = PlaceFurnitureInstance(placement, furnitureRoot, roomIndex, placedById);
+            if (instance == null)
+            {
+                continue;
+            }
+
+            if (!placedById.TryGetValue(placement.placeOnTopOfId, out GameObject target))
+            {
+                Debug.LogWarning("[CorridorRoomsGenerator] No se encontró el mueble objetivo '" + placement.placeOnTopOfId + "' para colocar '" + instance.name + "' en Room " + roomIndex + ".");
+                continue;
+            }
+
+            SnapInstanceOnTop(instance.transform, target.transform, placement.topOffset);
+        }
+    }
+
+    private GameObject PlaceFurnitureInstance(FurniturePlacement placement, Transform furnitureRoot, int roomIndex, Dictionary<string, GameObject> placedById)
+    {
+        GameObject instance = Instantiate(placement.prefab, furnitureRoot);
+        string placementId = string.IsNullOrWhiteSpace(placement.id) ? placement.prefab.name : placement.id;
+        instance.name = placementId + "_Room" + roomIndex;
+        instance.transform.localPosition = placement.localPosition;
+        instance.transform.localRotation = Quaternion.Euler(placement.localEulerAngles);
+
+        Vector3 desiredScale = placement.localScale;
+        bool hasZeroScale = Mathf.Approximately(desiredScale.x, 0f)
+                            || Mathf.Approximately(desiredScale.y, 0f)
+                            || Mathf.Approximately(desiredScale.z, 0f);
+
+        if (hasZeroScale)
+        {
+            desiredScale = placement.prefab.transform.localScale;
+            if (Mathf.Approximately(desiredScale.x, 0f)
+                || Mathf.Approximately(desiredScale.y, 0f)
+                || Mathf.Approximately(desiredScale.z, 0f))
+            {
+                desiredScale = Vector3.one;
+            }
+        }
+
+        instance.transform.localScale = desiredScale;
+        placedById[placementId] = instance;
+        return instance;
+    }
+
+    private void SnapInstanceOnTop(Transform moving, Transform target, float extraOffset)
+    {
+        if (!TryGetCombinedRendererBounds(target, out Bounds targetBounds)
+            || !TryGetCombinedRendererBounds(moving, out Bounds movingBounds))
+        {
+            Debug.LogWarning("[CorridorRoomsGenerator] No se pudieron calcular bounds para apilar muebles ('" + moving.name + "' sobre '" + target.name + "').");
+            return;
+        }
+
+        float yDelta = (targetBounds.max.y - movingBounds.min.y) + Mathf.Max(0f, extraOffset);
+        moving.position += new Vector3(0f, yDelta, 0f);
+    }
+
+    private bool TryGetCombinedRendererBounds(Transform root, out Bounds combined)
+    {
+        Renderer[] renderers = root.GetComponentsInChildren<Renderer>();
+        if (renderers == null || renderers.Length == 0)
+        {
+            combined = default;
+            return false;
+        }
+
+        combined = renderers[0].bounds;
+        for (int i = 1; i < renderers.Length; i++)
+        {
+            combined.Encapsulate(renderers[i].bounds);
+        }
+
+        return true;
+    }
+
+    private bool ShouldPlaceInRoom(FurniturePlacement placement, int roomIndex, int side)
+    {
+        if (placement.useSpecificRooms)
+        {
+            if (placement.specificRoomIndices == null || placement.specificRoomIndices.Count == 0)
+            {
+                return false;
+            }
+
+            bool roomIsIncluded = false;
+            for (int i = 0; i < placement.specificRoomIndices.Count; i++)
+            {
+                if (placement.specificRoomIndices[i] == roomIndex)
+                {
+                    roomIsIncluded = true;
+                    break;
+                }
+            }
+
+            return roomIsIncluded;
+        }
+
+        int everyN = Mathf.Max(1, placement.placeEveryNRooms);
+        if (((roomIndex - 1) % everyN) != 0)
+        {
+            return false;
+        }
+
+        bool isLeftRoom = side < 0;
+        bool isRightRoom = side > 0;
+        if ((isLeftRoom && !placement.placeOnLeftRooms) || (isRightRoom && !placement.placeOnRightRooms))
+        {
+            return false;
+        }
+
+        return true;
     }
 
     private void BuildDoorwayWall(

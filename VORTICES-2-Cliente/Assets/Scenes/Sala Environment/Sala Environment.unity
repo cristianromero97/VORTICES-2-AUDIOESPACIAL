@@ -180,7 +180,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 6598815579406187037, guid: 9f5a24a380916d14db9775daab4fe333, type: 3}
       propertyPath: m_IsActive
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 9f5a24a380916d14db9775daab4fe333, type: 3}
@@ -1165,19 +1165,33 @@ MonoBehaviour:
   playerStartLocalPosition: {x: 0, y: 0, z: 1.5}
   playerStartLocalEulerAngles: {x: 0, y: 0, z: 0}
   corridorWidth: 4
-  corridorHeight: 3
+  corridorHeight: 6
   corridorSegmentLength: 8
   wallThickness: 0.2
   roomWidth: 6
   roomDepth: 6
   doorwayWidth: 1.8
-  doorwayHeight: 2.2
+  doorwayHeight: 4.2
   corridorFloorMaterial: {fileID: 2100000, guid: 23a7dca1502064b488454db6ddd0c91e, type: 2}
   corridorWallMaterial: {fileID: 2100000, guid: 9db0680c40c0dfc4e99391318e91e787, type: 2}
   corridorCeilingMaterial: {fileID: 2100000, guid: ebbd6e09454bc4746a50db8883717cb3, type: 2}
   roomFloorMaterial: {fileID: 2100000, guid: 23a7dca1502064b488454db6ddd0c91e, type: 2}
   roomWallMaterial: {fileID: 2100000, guid: 9db0680c40c0dfc4e99391318e91e787, type: 2}
   roomCeilingMaterial: {fileID: 2100000, guid: ebbd6e09454bc4746a50db8883717cb3, type: 2}
+  generateFurniture: 1
+  furniturePlacements:
+  - id: 1
+    prefab: {fileID: 7690519952026649423, guid: 6f43b2566a8dcad4aa8e75125eeda38e, type: 3}
+    localPosition: {x: 0, y: 0, z: 0}
+    localEulerAngles: {x: 0, y: 0, z: 0}
+    localScale: {x: 0, y: 0, z: 0}
+    placeOnTopOfId: 
+    topOffset: 0
+    useSpecificRooms: 0
+    specificRoomIndices: 
+    placeEveryNRooms: 1
+    placeOnLeftRooms: 1
+    placeOnRightRooms: 1
 --- !u!4 &624806635
 Transform:
   m_ObjectHideFlags: 0
