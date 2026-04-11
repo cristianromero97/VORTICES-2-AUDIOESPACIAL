@@ -180,7 +180,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 6598815579406187037, guid: 9f5a24a380916d14db9775daab4fe333, type: 3}
       propertyPath: m_IsActive
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     m_RemovedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 9f5a24a380916d14db9775daab4fe333, type: 3}
@@ -1168,8 +1168,8 @@ MonoBehaviour:
   corridorHeight: 6
   corridorSegmentLength: 8
   wallThickness: 0.2
-  roomWidth: 6
-  roomDepth: 6
+  roomWidth: 15
+  roomDepth: 15
   doorwayWidth: 1.8
   doorwayHeight: 4.2
   corridorFloorMaterial: {fileID: 2100000, guid: 23a7dca1502064b488454db6ddd0c91e, type: 2}
@@ -1184,6 +1184,90 @@ MonoBehaviour:
     prefab: {fileID: 7690519952026649423, guid: 6f43b2566a8dcad4aa8e75125eeda38e, type: 3}
     localPosition: {x: 0, y: 0, z: 0}
     localEulerAngles: {x: 0, y: 0, z: 0}
+    localScale: {x: 0, y: 0, z: 0}
+    placeOnTopOfId: 
+    topOffset: 0
+    useSpecificRooms: 0
+    specificRoomIndices: 
+    placeEveryNRooms: 1
+    placeOnLeftRooms: 1
+    placeOnRightRooms: 1
+  - id: 2
+    prefab: {fileID: 8387792330663407722, guid: 9d4494b8b100519479f9699c5a7390a9, type: 3}
+    localPosition: {x: 6.3, y: 0, z: 6.3}
+    localEulerAngles: {x: 0, y: 180, z: 0}
+    localScale: {x: 0, y: 0, z: 0}
+    placeOnTopOfId: 
+    topOffset: 0
+    useSpecificRooms: 0
+    specificRoomIndices: 
+    placeEveryNRooms: 1
+    placeOnLeftRooms: 1
+    placeOnRightRooms: 1
+  - id: 3
+    prefab: {fileID: 8387792330663407722, guid: 9d4494b8b100519479f9699c5a7390a9, type: 3}
+    localPosition: {x: -6.3, y: 0, z: 6.3}
+    localEulerAngles: {x: 0, y: 180, z: 0}
+    localScale: {x: 0, y: 0, z: 0}
+    placeOnTopOfId: 
+    topOffset: 0
+    useSpecificRooms: 0
+    specificRoomIndices: 
+    placeEveryNRooms: 1
+    placeOnLeftRooms: 1
+    placeOnRightRooms: 1
+  - id: 4
+    prefab: {fileID: 8460109943172831355, guid: c24cdd6fcf1f09248832426ea5388c7f, type: 3}
+    localPosition: {x: -4.95, y: 0, z: 9}
+    localEulerAngles: {x: 0, y: 180, z: 0}
+    localScale: {x: 0, y: 0, z: 0}
+    placeOnTopOfId: 
+    topOffset: 0
+    useSpecificRooms: 0
+    specificRoomIndices: 
+    placeEveryNRooms: 1
+    placeOnLeftRooms: 1
+    placeOnRightRooms: 1
+  - id: 5
+    prefab: {fileID: 1235057659659040794, guid: d5026a2aaf9d8394a9e8b886d38dbfac, type: 3}
+    localPosition: {x: 3, y: 0, z: 5}
+    localEulerAngles: {x: 0, y: 180, z: 0}
+    localScale: {x: 0, y: 0, z: 0}
+    placeOnTopOfId: 
+    topOffset: 0
+    useSpecificRooms: 0
+    specificRoomIndices: 
+    placeEveryNRooms: 1
+    placeOnLeftRooms: 1
+    placeOnRightRooms: 1
+  - id: 6
+    prefab: {fileID: 1235057659659040794, guid: d5026a2aaf9d8394a9e8b886d38dbfac, type: 3}
+    localPosition: {x: -3, y: 0, z: 5}
+    localEulerAngles: {x: 0, y: 180, z: 0}
+    localScale: {x: 0, y: 0, z: 0}
+    placeOnTopOfId: 
+    topOffset: 0
+    useSpecificRooms: 0
+    specificRoomIndices: 
+    placeEveryNRooms: 1
+    placeOnLeftRooms: 1
+    placeOnRightRooms: 1
+  - id: 7
+    prefab: {fileID: 3458046819338091022, guid: 0602526b549f4e74c9107db59bde2a39, type: 3}
+    localPosition: {x: -3, y: 0, z: -5}
+    localEulerAngles: {x: 0, y: 180, z: 0}
+    localScale: {x: 0, y: 0, z: 0}
+    placeOnTopOfId: 
+    topOffset: 0
+    useSpecificRooms: 0
+    specificRoomIndices: 
+    placeEveryNRooms: 1
+    placeOnLeftRooms: 1
+    placeOnRightRooms: 1
+  - id: 8
+    prefab: {fileID: 7690519952026649423, guid: 6f43b2566a8dcad4aa8e75125eeda38e, type: 3}
+    localPosition: {x: 3, y: 0, z: -5}
+    localEulerAngles: {x: 0, y: 180, z: 0}
     localScale: {x: 0, y: 0, z: 0}
     placeOnTopOfId: 
     topOffset: 0
