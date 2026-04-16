@@ -1269,7 +1269,31 @@ MonoBehaviour:
     localPosition: {x: 3, y: 0, z: -5}
     localEulerAngles: {x: 0, y: 180, z: 0}
     localScale: {x: 0, y: 0, z: 0}
-    placeOnTopOfId: 
+    placeOnTopOfId: 9
+    topOffset: 0
+    useSpecificRooms: 0
+    specificRoomIndices: 
+    placeEveryNRooms: 1
+    placeOnLeftRooms: 1
+    placeOnRightRooms: 1
+  - id: 9
+    prefab: {fileID: 1773044524037658, guid: c222f9f5d39acc34da546b3f301c3d03, type: 3}
+    localPosition: {x: 3, y: 0, z: -5}
+    localEulerAngles: {x: 0, y: 270, z: 0}
+    localScale: {x: 0, y: 0, z: 0}
+    placeOnTopOfId: 8
+    topOffset: 0
+    useSpecificRooms: 0
+    specificRoomIndices: 
+    placeEveryNRooms: 1
+    placeOnLeftRooms: 1
+    placeOnRightRooms: 1
+  - id: 10
+    prefab: {fileID: 1773044524037658, guid: c222f9f5d39acc34da546b3f301c3d03, type: 3}
+    localPosition: {x: 0, y: 0, z: 0}
+    localEulerAngles: {x: 0, y: 0, z: 0}
+    localScale: {x: 0, y: 0, z: 0}
+    placeOnTopOfId: 1
     topOffset: 0
     useSpecificRooms: 0
     specificRoomIndices: 
