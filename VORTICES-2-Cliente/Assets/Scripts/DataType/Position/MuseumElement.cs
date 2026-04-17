@@ -27,8 +27,22 @@ namespace Vortices
 
         public void SetSelected(bool selected)
         {
+            if (selected == isSelected)
+            {
+                return;
+            }
+
             isSelected = selected;
             UpdateVisualState(); // Método que actualiza el estado visual del cuadro
+
+            if (selected)
+            {
+                AudioManager.Instance.PlayObjectSelectedSound(transform.position);
+            }
+            else
+            {
+                AudioManager.Instance.PlayObjectDeselectedSound(transform.position);
+            }
         }
 
         private void UpdateVisualState()

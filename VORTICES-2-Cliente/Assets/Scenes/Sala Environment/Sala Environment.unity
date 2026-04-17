@@ -1192,6 +1192,8 @@ MonoBehaviour:
     placeEveryNRooms: 1
     placeOnLeftRooms: 1
     placeOnRightRooms: 1
+    audio:
+      roomAudioOverrides: []
   - id: 2
     prefab: {fileID: 8387792330663407722, guid: 9d4494b8b100519479f9699c5a7390a9, type: 3}
     localPosition: {x: 6.3, y: 0, z: 6.3}
@@ -1204,6 +1206,8 @@ MonoBehaviour:
     placeEveryNRooms: 1
     placeOnLeftRooms: 1
     placeOnRightRooms: 1
+    audio:
+      roomAudioOverrides: []
   - id: 3
     prefab: {fileID: 8387792330663407722, guid: 9d4494b8b100519479f9699c5a7390a9, type: 3}
     localPosition: {x: -6.3, y: 0, z: 6.3}
@@ -1216,6 +1220,8 @@ MonoBehaviour:
     placeEveryNRooms: 1
     placeOnLeftRooms: 1
     placeOnRightRooms: 1
+    audio:
+      roomAudioOverrides: []
   - id: 4
     prefab: {fileID: 8460109943172831355, guid: c24cdd6fcf1f09248832426ea5388c7f, type: 3}
     localPosition: {x: -4.95, y: 0, z: 9}
@@ -1228,6 +1234,8 @@ MonoBehaviour:
     placeEveryNRooms: 1
     placeOnLeftRooms: 1
     placeOnRightRooms: 1
+    audio:
+      roomAudioOverrides: []
   - id: 5
     prefab: {fileID: 1235057659659040794, guid: d5026a2aaf9d8394a9e8b886d38dbfac, type: 3}
     localPosition: {x: 3, y: 0, z: 5}
@@ -1240,6 +1248,8 @@ MonoBehaviour:
     placeEveryNRooms: 1
     placeOnLeftRooms: 1
     placeOnRightRooms: 1
+    audio:
+      roomAudioOverrides: []
   - id: 6
     prefab: {fileID: 1235057659659040794, guid: d5026a2aaf9d8394a9e8b886d38dbfac, type: 3}
     localPosition: {x: -3, y: 0, z: 5}
@@ -1252,6 +1262,8 @@ MonoBehaviour:
     placeEveryNRooms: 1
     placeOnLeftRooms: 1
     placeOnRightRooms: 1
+    audio:
+      roomAudioOverrides: []
   - id: 7
     prefab: {fileID: 3458046819338091022, guid: 0602526b549f4e74c9107db59bde2a39, type: 3}
     localPosition: {x: -3, y: 0, z: -5}
@@ -1264,6 +1276,8 @@ MonoBehaviour:
     placeEveryNRooms: 1
     placeOnLeftRooms: 1
     placeOnRightRooms: 1
+    audio:
+      roomAudioOverrides: []
   - id: 8
     prefab: {fileID: 7690519952026649423, guid: 6f43b2566a8dcad4aa8e75125eeda38e, type: 3}
     localPosition: {x: 3, y: 0, z: -5}
@@ -1276,6 +1290,8 @@ MonoBehaviour:
     placeEveryNRooms: 1
     placeOnLeftRooms: 1
     placeOnRightRooms: 1
+    audio:
+      roomAudioOverrides: []
   - id: 9
     prefab: {fileID: 1773044524037658, guid: c222f9f5d39acc34da546b3f301c3d03, type: 3}
     localPosition: {x: 3, y: 0, z: -5}
@@ -1288,6 +1304,16 @@ MonoBehaviour:
     placeEveryNRooms: 1
     placeOnLeftRooms: 1
     placeOnRightRooms: 1
+    audio:
+      roomAudioOverrides:
+      - roomId: 2
+        audioClip: {fileID: 8300000, guid: 27746166e9cb7cb4bbdcf91619227e13, type: 3}
+        baseVolume: 1
+        minImmersionLevel: 2
+        minDistance: 1
+        maxDistance: 2
+        overrideEmitterType: 1
+        emitterType: 1
   - id: 10
     prefab: {fileID: 1773044524037658, guid: c222f9f5d39acc34da546b3f301c3d03, type: 3}
     localPosition: {x: 0, y: 0, z: 0}
@@ -1300,6 +1326,8 @@ MonoBehaviour:
     placeEveryNRooms: 1
     placeOnLeftRooms: 1
     placeOnRightRooms: 1
+    audio:
+      roomAudioOverrides: []
 --- !u!4 &624806635
 Transform:
   m_ObjectHideFlags: 0
@@ -1379,6 +1407,61 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 7529693298443769874, guid: fec47b409b57ac14a9ed976702113a05, type: 3}
   m_PrefabInstance: {fileID: 7529693298065533806}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &852955005
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 852955007}
+  - component: {fileID: 852955008}
+  m_Layer: 0
+  m_Name: AudioManager
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &852955007
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 852955005}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -8.818695, y: 9.492173, z: 53.45544}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_RootOrder: 7
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &852955008
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 852955005}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6ccb8044c2b2f6249b77c049365f0b89, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  initialImmersionLevel: 4
+  immersionLevels: []
+  autoDiscoverEmitters: 1
+  persistAcrossScenes: 1
+  objectSelectedClip: {fileID: 8300000, guid: 8c258dca7e08fb1438113b0b75348f71, type: 3}
+  objectDeselectedClip: {fileID: 8300000, guid: 8c258dca7e08fb1438113b0b75348f71, type: 3}
+  outputMixerGroup: {fileID: 24300002, guid: d5b150916a5eaf349b71e418b1f0d83e, type: 2}
+  oneShotMinDistance: 0.5
+  oneShotMaxDistance: 12
+  filterEmittersByRoomId: 0
+  enabledRoomIds: 
 --- !u!1 &904779002
 GameObject:
   m_ObjectHideFlags: 0

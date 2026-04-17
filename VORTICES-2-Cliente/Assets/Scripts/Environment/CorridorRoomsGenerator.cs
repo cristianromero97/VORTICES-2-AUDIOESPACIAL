@@ -3,6 +3,48 @@ using System.Collections.Generic;
 
 public class CorridorRoomsGenerator : MonoBehaviour
 {
+    // ─────────────────────────────────────────────
+    //  Configuración de audio opcional por mueble
+    // ─────────────────────────────────────────────
+    [System.Serializable]
+    private class RoomAudioOverride
+    {
+        [Tooltip("ID de sala al que aplica esta configuración (Room_1 => 1, Room_2 => 2, etc.).")]
+        [Min(1)] public int roomId = 1;
+
+        [Tooltip("Clip a reproducir para esta sala. Si está vacío, se usa el clip base.")]
+        public AudioClip audioClip;
+
+        [Tooltip("Volumen base del emisor para esta sala (0–1).")]
+        [Range(0f, 1f)] public float baseVolume = 1f;
+
+        [Tooltip("Nivel mínimo de inmersión para activar el sonido en esta sala (1–6).")]
+        [Range(1, 6)] public int minImmersionLevel = 2;
+
+        [Tooltip("Distancia mínima de audio 3D para esta sala.")]
+        [Min(0f)] public float minDistance = 1f;
+
+        [Tooltip("Distancia máxima de audio 3D para esta sala.")]
+        [Min(0f)] public float maxDistance = 10f;
+
+        [Tooltip("Si está activo, reemplaza también el tipo de emisor en esta sala.")]
+        public bool overrideEmitterType = false;
+
+        [Tooltip("Tipo de emisor alternativo para esta sala (solo si overrideEmitterType = true).")]
+        public SoundEmitter.SoundEmitterType emitterType = SoundEmitter.SoundEmitterType.Custom;
+    }
+
+    [System.Serializable]
+    private class FurnitureAudioConfig
+    {
+        [Header("Audio por Sala")]
+        [Tooltip("Lista de audio por sala. Permite múltiples audios para el mismo objeto, según roomId.")]
+        public List<RoomAudioOverride> roomAudioOverrides = new List<RoomAudioOverride>();
+    }
+
+    // ─────────────────────────────────────────────
+    //  Placement de mueble
+    // ─────────────────────────────────────────────
     [System.Serializable]
     private class FurniturePlacement
     {
@@ -18,6 +60,10 @@ public class CorridorRoomsGenerator : MonoBehaviour
         [Min(1)] public int placeEveryNRooms = 1;
         public bool placeOnLeftRooms = true;
         public bool placeOnRightRooms = true;
+
+        [Header("Audio (opcional)")]
+        [Tooltip("Configuración de SoundEmitter para este mueble. Deja addSoundEmitter en false para ignorarlo.")]
+        public FurnitureAudioConfig audio = new FurnitureAudioConfig();
     }
 
     [Header("Generation")]
@@ -323,7 +369,89 @@ public class CorridorRoomsGenerator : MonoBehaviour
 
         instance.transform.localScale = desiredScale;
         placedById[placementId] = instance;
+
+        // Inyectar SoundEmitter si esta configurado para este mueble
+        InjectAudioIfNeeded(instance, placement.audio, roomIndex);
+
         return instance;
+    }
+
+    /// <summary>
+    /// Agrega o configura un SoundEmitter en el GameObject instanciado segun la
+    /// FurnitureAudioConfig del placement. Si el prefab ya tiene un SoundEmitter,
+    /// se reutiliza; de lo contrario se agrega uno nuevo.
+    /// </summary>
+    private void InjectAudioIfNeeded(GameObject instance, FurnitureAudioConfig audioConfig, int roomIndex)
+    {
+        if (audioConfig == null)
+        {
+            return;
+        }
+
+        bool hasRoomOverride = TryGetRoomAudioOverride(audioConfig, roomIndex, out RoomAudioOverride roomOverride);
+        if (!hasRoomOverride)
+        {
+            return;
+        }
+
+        SoundEmitter.SoundEmitterType emitterType = roomOverride.emitterType;
+        AudioClip clip = roomOverride.audioClip;
+        float baseVolume = roomOverride.baseVolume;
+        int minImmersionLevel = roomOverride.minImmersionLevel;
+        float minDistance = roomOverride.minDistance;
+        float maxDistance = roomOverride.maxDistance;
+
+        if (!roomOverride.overrideEmitterType)
+        {
+            emitterType = SoundEmitter.SoundEmitterType.Custom;
+        }
+
+        SoundEmitter emitter = instance.GetComponentInChildren<SoundEmitter>(includeInactive: true);
+        if (emitter == null)
+        {
+            emitter = instance.AddComponent<SoundEmitter>();
+        }
+
+        emitter.Configure(
+            emitterType,
+            clip,
+            baseVolume,
+            minImmersionLevel,
+            minDistance,
+            maxDistance,
+            roomIndex);
+
+        if (Application.isPlaying && AudioManager.Instance != null)
+        {
+            AudioManager.Instance.RegisterEmitter(emitter);
+        }
+    }
+
+    private bool TryGetRoomAudioOverride(FurnitureAudioConfig audioConfig, int roomIndex, out RoomAudioOverride roomOverride)
+    {
+        roomOverride = null;
+
+        if (audioConfig == null || audioConfig.roomAudioOverrides == null)
+        {
+            return false;
+        }
+
+        for (int i = 0; i < audioConfig.roomAudioOverrides.Count; i++)
+        {
+            RoomAudioOverride candidate = audioConfig.roomAudioOverrides[i];
+            if (candidate == null)
+            {
+                continue;
+            }
+
+            if (candidate.roomId == roomIndex)
+            {
+                roomOverride = candidate;
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private void SnapInstanceOnTop(Transform moving, Transform target, float extraOffset)
