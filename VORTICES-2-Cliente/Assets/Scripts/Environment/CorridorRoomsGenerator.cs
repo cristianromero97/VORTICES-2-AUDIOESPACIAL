@@ -138,6 +138,25 @@ public class CorridorRoomsGenerator : MonoBehaviour
         {
             MovePlayerToStart();
         }
+
+        if (Application.isPlaying)
+        {
+            RefreshSpatializerManagers();
+        }
+    }
+
+    private void RefreshSpatializerManagers()
+    {
+        SpatialiazerManager[] spatializerManagers = FindObjectsOfType<SpatialiazerManager>(includeInactive: true);
+        for (int i = 0; i < spatializerManagers.Length; i++)
+        {
+            if (spatializerManagers[i] == null)
+            {
+                continue;
+            }
+
+            spatializerManagers[i].ApplyToTargets();
+        }
     }
 
     [ContextMenu("Clear Generated Scenario")]
