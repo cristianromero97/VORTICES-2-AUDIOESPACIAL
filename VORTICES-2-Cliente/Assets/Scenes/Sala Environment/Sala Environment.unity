@@ -887,7 +887,7 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
-  m_RootOrder: 8
+  m_RootOrder: 7
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &362910459
 MonoBehaviour:
@@ -1073,7 +1073,7 @@ MonoBehaviour:
         baseVolume: 0.564
         minImmersionLevel: 4
         minDistance: 1
-        maxDistance: 3
+        maxDistance: 35
         overrideEmitterType: 1
         emitterType: 1
   - id: 12
@@ -1092,10 +1092,10 @@ MonoBehaviour:
       roomAudioOverrides:
       - roomId: 3
         audioClip: {fileID: 8300000, guid: df06b2aab6e8ad84d819b2a83ee3eefb, type: 3}
-        baseVolume: 0.405
+        baseVolume: 0.224
         minImmersionLevel: 4
         minDistance: 1
-        maxDistance: 3
+        maxDistance: 40
         overrideEmitterType: 1
         emitterType: 1
   audioInjector: {fileID: 362910459}
@@ -1406,220 +1406,6 @@ MonoBehaviour:
       m_Flags: 0
     m_Reference: {fileID: 7779212132400271959, guid: c348712bda248c246b8c49b3db54643f, type: 3}
   m_ButtonPressPoint: 0.5
---- !u!1 &624806633
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 624806635}
-  - component: {fileID: 624806634}
-  m_Layer: 0
-  m_Name: Scenario
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &624806634
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 624806633}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 921a1ecaf5760ef4f9e67fe76e0f4130, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  generateOnStart: 0
-  clearBeforeGenerate: 0
-  roomCount: 6
-  movePlayerToStartOnGenerate: 1
-  playerStartLocalPosition: {x: 0, y: 0, z: 1.5}
-  playerStartLocalEulerAngles: {x: 0, y: 0, z: 0}
-  corridorWidth: 4
-  corridorHeight: 6
-  corridorSegmentLength: 8
-  wallThickness: 0.2
-  roomWidth: 15
-  roomDepth: 15
-  doorwayWidth: 1.8
-  doorwayHeight: 4.2
-  corridorFloorMaterial: {fileID: 2100000, guid: 23a7dca1502064b488454db6ddd0c91e, type: 2}
-  corridorWallMaterial: {fileID: 2100000, guid: 9db0680c40c0dfc4e99391318e91e787, type: 2}
-  corridorCeilingMaterial: {fileID: 2100000, guid: ebbd6e09454bc4746a50db8883717cb3, type: 2}
-  roomFloorMaterial: {fileID: 2100000, guid: 23a7dca1502064b488454db6ddd0c91e, type: 2}
-  roomWallMaterial: {fileID: 2100000, guid: 9db0680c40c0dfc4e99391318e91e787, type: 2}
-  roomCeilingMaterial: {fileID: 2100000, guid: ebbd6e09454bc4746a50db8883717cb3, type: 2}
-  generateFurniture: 1
-  furniturePlacements:
-  - id: 1
-    prefab: {fileID: 7690519952026649423, guid: 6f43b2566a8dcad4aa8e75125eeda38e, type: 3}
-    localPosition: {x: 0, y: 0, z: 0}
-    localEulerAngles: {x: 0, y: 0, z: 0}
-    localScale: {x: 0, y: 0, z: 0}
-    placeOnTopOfId: 
-    topOffset: 0
-    useSpecificRooms: 0
-    specificRoomIndices: 
-    placeEveryNRooms: 1
-    placeOnLeftRooms: 1
-    placeOnRightRooms: 1
-    audio:
-      roomAudioOverrides: []
-  - id: 2
-    prefab: {fileID: 8387792330663407722, guid: 9d4494b8b100519479f9699c5a7390a9, type: 3}
-    localPosition: {x: 6.3, y: 0, z: 6.3}
-    localEulerAngles: {x: 0, y: 180, z: 0}
-    localScale: {x: 0, y: 0, z: 0}
-    placeOnTopOfId: 
-    topOffset: 0
-    useSpecificRooms: 0
-    specificRoomIndices: 
-    placeEveryNRooms: 1
-    placeOnLeftRooms: 1
-    placeOnRightRooms: 1
-    audio:
-      roomAudioOverrides: []
-  - id: 3
-    prefab: {fileID: 8387792330663407722, guid: 9d4494b8b100519479f9699c5a7390a9, type: 3}
-    localPosition: {x: -6.3, y: 0, z: 6.3}
-    localEulerAngles: {x: 0, y: 180, z: 0}
-    localScale: {x: 0, y: 0, z: 0}
-    placeOnTopOfId: 
-    topOffset: 0
-    useSpecificRooms: 0
-    specificRoomIndices: 
-    placeEveryNRooms: 1
-    placeOnLeftRooms: 1
-    placeOnRightRooms: 1
-    audio:
-      roomAudioOverrides: []
-  - id: 4
-    prefab: {fileID: 8460109943172831355, guid: c24cdd6fcf1f09248832426ea5388c7f, type: 3}
-    localPosition: {x: -4.95, y: 0, z: 9}
-    localEulerAngles: {x: 0, y: 180, z: 0}
-    localScale: {x: 0, y: 0, z: 0}
-    placeOnTopOfId: 
-    topOffset: 0
-    useSpecificRooms: 0
-    specificRoomIndices: 
-    placeEveryNRooms: 1
-    placeOnLeftRooms: 1
-    placeOnRightRooms: 1
-    audio:
-      roomAudioOverrides: []
-  - id: 5
-    prefab: {fileID: 1235057659659040794, guid: d5026a2aaf9d8394a9e8b886d38dbfac, type: 3}
-    localPosition: {x: 3, y: 0, z: 5}
-    localEulerAngles: {x: 0, y: 180, z: 0}
-    localScale: {x: 0, y: 0, z: 0}
-    placeOnTopOfId: 
-    topOffset: 0
-    useSpecificRooms: 0
-    specificRoomIndices: 
-    placeEveryNRooms: 1
-    placeOnLeftRooms: 1
-    placeOnRightRooms: 1
-    audio:
-      roomAudioOverrides: []
-  - id: 6
-    prefab: {fileID: 1235057659659040794, guid: d5026a2aaf9d8394a9e8b886d38dbfac, type: 3}
-    localPosition: {x: -3, y: 0, z: 5}
-    localEulerAngles: {x: 0, y: 180, z: 0}
-    localScale: {x: 0, y: 0, z: 0}
-    placeOnTopOfId: 
-    topOffset: 0
-    useSpecificRooms: 0
-    specificRoomIndices: 
-    placeEveryNRooms: 1
-    placeOnLeftRooms: 1
-    placeOnRightRooms: 1
-    audio:
-      roomAudioOverrides: []
-  - id: 7
-    prefab: {fileID: 3458046819338091022, guid: 0602526b549f4e74c9107db59bde2a39, type: 3}
-    localPosition: {x: -3, y: 0, z: -5}
-    localEulerAngles: {x: 0, y: 180, z: 0}
-    localScale: {x: 0, y: 0, z: 0}
-    placeOnTopOfId: 
-    topOffset: 0
-    useSpecificRooms: 0
-    specificRoomIndices: 
-    placeEveryNRooms: 1
-    placeOnLeftRooms: 1
-    placeOnRightRooms: 1
-    audio:
-      roomAudioOverrides: []
-  - id: 8
-    prefab: {fileID: 7690519952026649423, guid: 6f43b2566a8dcad4aa8e75125eeda38e, type: 3}
-    localPosition: {x: 3, y: 0, z: -5}
-    localEulerAngles: {x: 0, y: 180, z: 0}
-    localScale: {x: 0, y: 0, z: 0}
-    placeOnTopOfId: 9
-    topOffset: 0
-    useSpecificRooms: 0
-    specificRoomIndices: 
-    placeEveryNRooms: 1
-    placeOnLeftRooms: 1
-    placeOnRightRooms: 1
-    audio:
-      roomAudioOverrides: []
-  - id: 9
-    prefab: {fileID: 1773044524037658, guid: c222f9f5d39acc34da546b3f301c3d03, type: 3}
-    localPosition: {x: 3, y: 0, z: -5}
-    localEulerAngles: {x: 0, y: 270, z: 0}
-    localScale: {x: 0, y: 0, z: 0}
-    placeOnTopOfId: 8
-    topOffset: 0
-    useSpecificRooms: 0
-    specificRoomIndices: 
-    placeEveryNRooms: 1
-    placeOnLeftRooms: 1
-    placeOnRightRooms: 1
-    audio:
-      roomAudioOverrides:
-      - roomId: 2
-        audioClip: {fileID: 8300000, guid: 27746166e9cb7cb4bbdcf91619227e13, type: 3}
-        baseVolume: 1
-        minImmersionLevel: 2
-        minDistance: 1
-        maxDistance: 8
-        overrideEmitterType: 1
-        emitterType: 1
-  - id: 10
-    prefab: {fileID: 1773044524037658, guid: c222f9f5d39acc34da546b3f301c3d03, type: 3}
-    localPosition: {x: 0, y: 0, z: 0}
-    localEulerAngles: {x: 0, y: 0, z: 0}
-    localScale: {x: 0, y: 0, z: 0}
-    placeOnTopOfId: 1
-    topOffset: 0
-    useSpecificRooms: 0
-    specificRoomIndices: 
-    placeEveryNRooms: 1
-    placeOnLeftRooms: 1
-    placeOnRightRooms: 1
-    audio:
-      roomAudioOverrides: []
---- !u!4 &624806635
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 624806633}
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -8.818606, y: 6.3213253, z: 33.06032}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_RootOrder: 6
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &691992886
 GameObject:
   m_ObjectHideFlags: 0
@@ -1714,7 +1500,7 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
-  m_RootOrder: 7
+  m_RootOrder: 6
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &852955008
 MonoBehaviour:
@@ -1734,38 +1520,50 @@ MonoBehaviour:
     stereo: 0
     globalVolume: 0.6
     spatialBlend: 0
+    spread: 0
     dopplerLevel: 0
     rolloffMode: 1
+    spatialize: 1
   - levelName: Level 2
     stereo: 0
     globalVolume: 0.7
     spatialBlend: 0
+    spread: 0
     dopplerLevel: 0
     rolloffMode: 1
+    spatialize: 1
   - levelName: Level 3
     stereo: 1
     globalVolume: 0.8
     spatialBlend: 0.4
+    spread: 0
     dopplerLevel: 0
     rolloffMode: 0
+    spatialize: 1
   - levelName: Level 4
     stereo: 1
     globalVolume: 0.9
     spatialBlend: 1
-    dopplerLevel: 0
-    rolloffMode: 0
+    spread: 0
+    dopplerLevel: 1.69
+    rolloffMode: 2
+    spatialize: 1
   - levelName: Level 5
     stereo: 1
     globalVolume: 1
     spatialBlend: 1
+    spread: 0
     dopplerLevel: 1
     rolloffMode: 0
+    spatialize: 1
   - levelName: Level 6
     stereo: 1
     globalVolume: 1
     spatialBlend: 1
+    spread: 0
     dopplerLevel: 3
     rolloffMode: 0
+    spatialize: 1
   autoDiscoverEmitters: 1
   persistAcrossScenes: 1
   objectSelectedClip: {fileID: 8300000, guid: 8c258dca7e08fb1438113b0b75348f71, type: 3}
