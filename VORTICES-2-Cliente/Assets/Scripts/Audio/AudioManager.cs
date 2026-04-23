@@ -69,6 +69,11 @@ public class AudioManager : MonoBehaviour
                  "Requiere el plugin 'Oculus Spatializer' instalado en el proyecto.\n" +
                  "Recomendado solo en niveles altos (5–6) por su coste computacional.")]
         public bool spatialize = false;
+ 
+        [Tooltip("Curva de rolloff personalizada. Solo se usa cuando rolloffMode = Custom.\n" +
+                 "Eje X = distancia normalizada (0 = minDistance, 1 = maxDistance).\n" +
+                 "Eje Y = volumen (0 = silencio total, 1 = volumen completo).")]
+        public AnimationCurve customRolloffCurve = AnimationCurve.EaseInOut(0f, 1f, 1f, 0f);
     }
  
     // ─────────────────────────────────────────────
@@ -103,7 +108,11 @@ public class AudioManager : MonoBehaviour
     [Tooltip("Si está activo, solo sonarán emitters cuyos RoomId estén en la lista permitida.")]
     [SerializeField] private bool filterEmittersByRoomId = false;
  
-    [Tooltip("IDs de sala permitidos cuando el filtro está activo.")]
+    [Tooltip("Habilita todas las salas de una vez, ignorando la lista de IDs. " +
+             "Útil cuando tenés muchas salas y no querés cargarlas una por una.")]
+    [SerializeField] private bool enableAllRooms = true;
+ 
+    [Tooltip("IDs de sala permitidos cuando el filtro está activo y enableAllRooms = false.")]
     [SerializeField] private List<int> enabledRoomIds = new List<int>();
  
     // ─────────────────────────────────────────────
@@ -174,7 +183,43 @@ public class AudioManager : MonoBehaviour
         registeredEmitters.Remove(emitter);
     }
  
-    /// <summary>Devuelve la configuración de un nivel específico (null si nivel = 0).</summary>
+    /// <summary>Devuelve el primer SoundEmitter registrado con el soundId indicado. Null si no existe.</summary>
+    public SoundEmitter GetEmitterById(string soundId)
+    {
+        if (string.IsNullOrWhiteSpace(soundId)) return null;
+ 
+        foreach (SoundEmitter emitter in registeredEmitters)
+        {
+            if (emitter != null && emitter.SoundId == soundId)
+                return emitter;
+        }
+ 
+        return null;
+    }
+ 
+    /// <summary>Devuelve todos los SoundEmitters registrados con el soundId indicado.</summary>
+    public List<SoundEmitter> GetAllEmittersById(string soundId)
+    {
+        List<SoundEmitter> result = new List<SoundEmitter>();
+        if (string.IsNullOrWhiteSpace(soundId)) return result;
+ 
+        foreach (SoundEmitter emitter in registeredEmitters)
+        {
+            if (emitter != null && emitter.SoundId == soundId)
+                result.Add(emitter);
+        }
+ 
+        return result;
+    }
+ 
+    /// <summary>Desactiva todos los emitters con el soundId indicado.</summary>
+    public void DeactivateEmitterById(string soundId)
+    {
+        foreach (SoundEmitter emitter in GetAllEmittersById(soundId))
+            emitter.Deactivate();
+    }
+
+    /// <summary>Devuelve la configuración del nivel indicado (0 devuelve null).</summary>
     public ImmersionLevelConfig GetLevelConfig(int level)
     {
         int normalized = NormalizeLevel(level);
@@ -230,9 +275,44 @@ public class AudioManager : MonoBehaviour
     {
         if (!filterEmittersByRoomId) return true;
         if (emitter == null) return false;
+        if (enableAllRooms) return true;
  
         int id = emitter.RoomId;
         return id > 0 && enabledRoomIds != null && enabledRoomIds.Contains(id);
+    }
+ 
+    /// <summary>Habilita todas las salas de una vez sin modificar la lista de IDs.</summary>
+    public void EnableAllRooms()
+    {
+        enableAllRooms = true;
+        ApplyLevel(currentLevel);
+    }
+ 
+    /// <summary>
+    /// Habilita solo las salas indicadas. Desactiva enableAllRooms automáticamente.
+    /// </summary>
+    public void SetEnabledRooms(List<int> roomIds)
+    {
+        enableAllRooms = false;
+        enabledRoomIds = roomIds ?? new List<int>();
+        ApplyLevel(currentLevel);
+    }
+ 
+    /// <summary>Agrega una sala a la lista de habilitadas en runtime.</summary>
+    public void EnableRoom(int roomId)
+    {
+        enableAllRooms = false;
+        if (!enabledRoomIds.Contains(roomId))
+            enabledRoomIds.Add(roomId);
+        ApplyLevel(currentLevel);
+    }
+ 
+    /// <summary>Quita una sala de la lista de habilitadas en runtime.</summary>
+    public void DisableRoom(int roomId)
+    {
+        enableAllRooms = false;
+        enabledRoomIds.Remove(roomId);
+        ApplyLevel(currentLevel);
     }
  
     private void DiscoverAndRegisterAll()

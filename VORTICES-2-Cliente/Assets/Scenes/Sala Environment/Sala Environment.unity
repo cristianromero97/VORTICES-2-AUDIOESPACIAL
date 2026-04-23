@@ -1069,11 +1069,12 @@ MonoBehaviour:
     audio:
       roomAudioOverrides:
       - roomId: 2
+        soundId: 1
         audioClip: {fileID: 8300000, guid: 27746166e9cb7cb4bbdcf91619227e13, type: 3}
         baseVolume: 0.564
         minImmersionLevel: 4
         minDistance: 1
-        maxDistance: 35
+        maxDistance: 40
         overrideEmitterType: 1
         emitterType: 1
   - id: 12
@@ -1091,7 +1092,8 @@ MonoBehaviour:
     audio:
       roomAudioOverrides:
       - roomId: 3
-        audioClip: {fileID: 8300000, guid: df06b2aab6e8ad84d819b2a83ee3eefb, type: 3}
+        soundId: 2
+        audioClip: {fileID: 0}
         baseVolume: 0.224
         minImmersionLevel: 4
         minDistance: 1
@@ -1524,6 +1526,30 @@ MonoBehaviour:
     dopplerLevel: 0
     rolloffMode: 1
     spatialize: 1
+    customRolloffCurve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0.033332825
+        value: 0.9976425
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      - serializedVersion: 3
+        time: 1
+        value: 0
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
   - levelName: Level 2
     stereo: 0
     globalVolume: 0.7
@@ -1532,6 +1558,30 @@ MonoBehaviour:
     dopplerLevel: 0
     rolloffMode: 1
     spatialize: 1
+    customRolloffCurve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 1
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      - serializedVersion: 3
+        time: 1
+        value: 0
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
   - levelName: Level 3
     stereo: 1
     globalVolume: 0.8
@@ -1540,6 +1590,30 @@ MonoBehaviour:
     dopplerLevel: 0
     rolloffMode: 0
     spatialize: 1
+    customRolloffCurve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 1
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      - serializedVersion: 3
+        time: 1
+        value: 0
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
   - levelName: Level 4
     stereo: 1
     globalVolume: 0.9
@@ -1548,6 +1622,30 @@ MonoBehaviour:
     dopplerLevel: 1.69
     rolloffMode: 2
     spatialize: 1
+    customRolloffCurve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: -0.037498474
+        value: 1.0164948
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      - serializedVersion: 3
+        time: 1
+        value: 0
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
   - levelName: Level 5
     stereo: 1
     globalVolume: 1
@@ -1556,6 +1654,30 @@ MonoBehaviour:
     dopplerLevel: 1
     rolloffMode: 0
     spatialize: 1
+    customRolloffCurve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 1
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      - serializedVersion: 3
+        time: 1
+        value: 0
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
   - levelName: Level 6
     stereo: 1
     globalVolume: 1
@@ -1564,14 +1686,39 @@ MonoBehaviour:
     dopplerLevel: 3
     rolloffMode: 0
     spatialize: 1
+    customRolloffCurve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 1
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      - serializedVersion: 3
+        time: 1
+        value: 0
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
   autoDiscoverEmitters: 1
   persistAcrossScenes: 1
-  objectSelectedClip: {fileID: 8300000, guid: 8c258dca7e08fb1438113b0b75348f71, type: 3}
-  objectDeselectedClip: {fileID: 8300000, guid: 8c258dca7e08fb1438113b0b75348f71, type: 3}
-  outputMixerGroup: {fileID: 24300002, guid: d5b150916a5eaf349b71e418b1f0d83e, type: 2}
+  objectSelectedClip: {fileID: 0}
+  objectDeselectedClip: {fileID: 0}
+  outputMixerGroup: {fileID: 0}
   oneShotMinDistance: 0.5
   oneShotMaxDistance: 12
-  filterEmittersByRoomId: 0
+  filterEmittersByRoomId: 1
+  enableAllRooms: 0
   enabledRoomIds: 010000000200000003000000040000000500000006000000
 --- !u!1 &904779002
 GameObject:
