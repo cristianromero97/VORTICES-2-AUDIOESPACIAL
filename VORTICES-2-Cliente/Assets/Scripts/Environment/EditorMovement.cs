@@ -7,7 +7,7 @@ namespace Vortices
         public float moveSpeed = 5f;
         public float lookSpeed = 2f;
 
-        private float rotY = 0f;
+        private float rotY = 180f;
         private CharacterController cc;
 
         private void Start()

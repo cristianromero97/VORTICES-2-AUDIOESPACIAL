@@ -2,452 +2,456 @@ using UnityEngine;
 using System.Collections.Generic;
 using UnityEngine.Audio;
  
-/// <summary>
-/// AudioManager: Controla los niveles de inmersión auditiva según el modelo definido en el
-/// Prototipo P003 de MOTIONS. Gestiona todos los SoundEmitters registrados en la escena.
-///
-/// NIVELES DE INMERSIÓN AUDITIVA (basados en MOTIONS P003):
-///   Nivel 0 — Sin audio (silencio total)
-///   Nivel 1 — Mono, 22050 Hz, sin 3D
-///   Nivel 2 — Mono, 32000 Hz, sin 3D
-///   Nivel 3 — Stereo, 44100 Hz, 3D parcial
-///   Nivel 4 — Stereo, 48000 Hz, 3D completo
-///   Nivel 5 — Stereo, 88200 Hz, 3D + Doppler + HRTF
-///   Nivel 6 — Stereo, 96000 Hz, 3D + Doppler máximo + HRTF
-///
-/// HRTF (Head-Related Transfer Function):
-///   Activar spatialize = true en niveles 5 y 6 habilita el Oculus Spatializer,
-///   que modela cómo el oído y la cabeza afectan la percepción direccional del sonido.
-///   Requiere que el plugin "Oculus Spatializer" esté instalado en el proyecto.
-///
-/// NOTA sobre Mono/Stereo: Unity no permite cambiar el modo Stereo de un AudioClip en
-/// tiempo de ejecución. Para aprovechar esa configuración, los clips deben importarse
-/// con el ajuste correcto en sus Import Settings (Force To Mono activado o desactivado).
-/// </summary>
-public class AudioManager : MonoBehaviour
+namespace Vortices
 {
-    // ─────────────────────────────────────────────
-    //  Singleton
-    // ─────────────────────────────────────────────
-    public static AudioManager Instance { get; private set; }
- 
-    // ─────────────────────────────────────────────
-    //  Configuración de un nivel de inmersión
-    // ─────────────────────────────────────────────
-    [System.Serializable]
-    public class ImmersionLevelConfig
+     
+    /// <summary>
+    /// AudioManager: Controla los niveles de inmersión auditiva según el modelo definido en el
+    /// Prototipo P003 de MOTIONS. Gestiona todos los SoundEmitters registrados en la escena.
+    ///
+    /// NIVELES DE INMERSIÓN AUDITIVA (basados en MOTIONS P003):
+    ///   Nivel 0 — Sin audio (silencio total)
+    ///   Nivel 1 — Mono, 22050 Hz, sin 3D
+    ///   Nivel 2 — Mono, 32000 Hz, sin 3D
+    ///   Nivel 3 — Stereo, 44100 Hz, 3D parcial
+    ///   Nivel 4 — Stereo, 48000 Hz, 3D completo
+    ///   Nivel 5 — Stereo, 88200 Hz, 3D + Doppler + HRTF
+    ///   Nivel 6 — Stereo, 96000 Hz, 3D + Doppler máximo + HRTF
+    ///
+    /// HRTF (Head-Related Transfer Function):
+    ///   Activar spatialize = true en niveles 5 y 6 habilita el Oculus Spatializer,
+    ///   que modela cómo el oído y la cabeza afectan la percepción direccional del sonido.
+    ///   Requiere que el plugin "Oculus Spatializer" esté instalado en el proyecto.
+    ///
+    /// NOTA sobre Mono/Stereo: Unity no permite cambiar el modo Stereo de un AudioClip en
+    /// tiempo de ejecución. Para aprovechar esa configuración, los clips deben importarse
+    /// con el ajuste correcto en sus Import Settings (Force To Mono activado o desactivado).
+    /// </summary>
+    public class AudioManager : MonoBehaviour
     {
-        [Tooltip("Nombre descriptivo del nivel (solo referencia).")]
-        public string levelName = "Nivel";
- 
-        [Tooltip("Modo Stereo (true) o Mono (false). Informativo: ver comentario de clase.")]
-        public bool stereo = false;
- 
-        [Tooltip("Volumen global aplicado a todos los emitters activos en este nivel.")]
-        [Range(0f, 1f)]
-        public float globalVolume = 1f;
- 
-        [Tooltip("Factor de mezcla 3D (0 = 2D plano, 1 = 3D espacial completo).")]
-        [Range(0f, 1f)]
-        public float spatialBlend = 0f;
- 
-        [Tooltip("Apertura del campo estéreo.\n" +
-                 "0   = muy direccional (el sonido se oye solo por el oído más cercano a la fuente).\n" +
-                 "180 = semi-omnidireccional.\n" +
-                 "360 = igual en ambos oídos sin importar la posición.")]
-        [Range(0f, 360f)]
-        public float spread = 0f;
- 
-        [Tooltip("Multiplicador del efecto Doppler (0 = desactivado).")]
-        [Range(0f, 5f)]
-        public float dopplerLevel = 0f;
- 
-        [Tooltip("Tipo de curva de rolloff para atenuación con la distancia.")]
-        public AudioRolloffMode rolloffMode = AudioRolloffMode.Logarithmic;
- 
-        [Tooltip("Activa el Oculus Spatializer (HRTF) para percepción direccional precisa.\n" +
-                 "Requiere el plugin 'Oculus Spatializer' instalado en el proyecto.\n" +
-                 "Recomendado solo en niveles altos (5–6) por su coste computacional.")]
-        public bool spatialize = false;
- 
-        [Tooltip("Curva de rolloff personalizada. Solo se usa cuando rolloffMode = Custom.\n" +
-                 "Eje X = distancia normalizada (0 = minDistance, 1 = maxDistance).\n" +
-                 "Eje Y = volumen (0 = silencio total, 1 = volumen completo).")]
-        public AnimationCurve customRolloffCurve = AnimationCurve.EaseInOut(0f, 1f, 1f, 0f);
-    }
- 
-    // ─────────────────────────────────────────────
-    //  Inspector
-    // ─────────────────────────────────────────────
-    [Header("Nivel de Inmersión Auditiva")]
-    [Tooltip("Nivel activo al iniciar la escena (0 = sin audio).")]
-    [SerializeField, Range(0, 6)]
-    private int initialImmersionLevel = 0;
- 
-    [Tooltip("Configuraciones de cada nivel de inmersión. Índice 0 = Nivel 1, índice 1 = Nivel 2, etc.")]
-    [SerializeField]
-    private List<ImmersionLevelConfig> immersionLevels = new List<ImmersionLevelConfig>();
- 
-    [Header("Comportamiento")]
-    [Tooltip("Si está activo, busca y registra todos los SoundEmitters en la escena al Start.")]
-    [SerializeField]
-    private bool autoDiscoverEmitters = true;
- 
-    [Tooltip("Si está activo, este GameObject no se destruye al cargar una nueva escena.")]
-    [SerializeField]
-    private bool persistAcrossScenes = false;
- 
-    [Header("Clips de Compatibilidad (MuseumElement)")]
-    [SerializeField] private AudioClip objectSelectedClip;
-    [SerializeField] private AudioClip objectDeselectedClip;
-    [SerializeField] private AudioMixerGroup outputMixerGroup;
-    [SerializeField, Min(0.01f)] private float oneShotMinDistance = 0.5f;
-    [SerializeField, Min(0.01f)] private float oneShotMaxDistance = 12f;
- 
-    [Header("Filtro por Sala (Opcional)")]
-    [Tooltip("Si está activo, solo sonarán emitters cuyos RoomId estén en la lista permitida.")]
-    [SerializeField] private bool filterEmittersByRoomId = false;
- 
-    [Tooltip("Habilita todas las salas de una vez, ignorando la lista de IDs. " +
-             "Útil cuando tenés muchas salas y no querés cargarlas una por una.")]
-    [SerializeField] private bool enableAllRooms = true;
- 
-    [Tooltip("IDs de sala permitidos cuando el filtro está activo y enableAllRooms = false.")]
-    [SerializeField] private List<int> enabledRoomIds = new List<int>();
- 
-    // ─────────────────────────────────────────────
-    //  Estado interno
-    // ─────────────────────────────────────────────
-    private readonly List<SoundEmitter> registeredEmitters = new List<SoundEmitter>();
-    private int currentLevel = 0;
- 
-    /// <summary>Nivel de inmersión auditiva actualmente aplicado (0–6).</summary>
-    public int CurrentImmersionLevel => currentLevel;
- 
-    // ─────────────────────────────────────────────
-    //  Unity
-    // ─────────────────────────────────────────────
-    private void Awake()
-    {
-        if (Instance != null && Instance != this)
+        // ─────────────────────────────────────────────
+        //  Singleton
+        // ─────────────────────────────────────────────
+        public static AudioManager Instance { get; private set; }
+     
+        // ─────────────────────────────────────────────
+        //  Configuración de un nivel de inmersión
+        // ─────────────────────────────────────────────
+        [System.Serializable]
+        public class ImmersionLevelConfig
         {
-            Debug.LogWarning("[AudioManager] Ya existe una instancia. Destruyendo duplicado.", this);
-            Destroy(gameObject);
-            return;
+            [Tooltip("Nombre descriptivo del nivel (solo referencia).")]
+            public string levelName = "Nivel";
+     
+            [Tooltip("Modo Stereo (true) o Mono (false). Informativo: ver comentario de clase.")]
+            public bool stereo = false;
+     
+            [Tooltip("Volumen global aplicado a todos los emitters activos en este nivel.")]
+            [Range(0f, 1f)]
+            public float globalVolume = 1f;
+     
+            [Tooltip("Factor de mezcla 3D (0 = 2D plano, 1 = 3D espacial completo).")]
+            [Range(0f, 1f)]
+            public float spatialBlend = 0f;
+     
+                [Tooltip("Apertura del campo estéreo.\n" +
+                     "0   = muy direccional (el sonido se oye solo por el oído más cercano a la fuente).\n" +
+                     "180 = semi-omnidireccional.\n" +
+                     "360 = igual en ambos oídos sin importar la posición.")]
+            [Range(0f, 360f)]
+            public float spread = 0f;
+     
+            [Tooltip("Multiplicador del efecto Doppler (0 = desactivado).")]
+            [Range(0f, 5f)]
+            public float dopplerLevel = 0f;
+     
+            [Tooltip("Tipo de curva de rolloff para atenuación con la distancia.")]
+            public AudioRolloffMode rolloffMode = AudioRolloffMode.Logarithmic;
+     
+                [Tooltip("Activa el Oculus Spatializer (HRTF) para percepción direccional precisa.\n" +
+                     "Requiere el plugin 'Oculus Spatializer' instalado en el proyecto.\n" +
+                     "Recomendado solo en niveles altos (5–6) por su coste computacional.")]
+            public bool spatialize = false;
+     
+                [Tooltip("Curva de rolloff personalizada. Solo se usa cuando rolloffMode = Custom.\n" +
+                     "Eje X = distancia normalizada (0 = minDistance, 1 = maxDistance).\n" +
+                     "Eje Y = volumen (0 = silencio total, 1 = volumen completo).")]
+            public AnimationCurve customRolloffCurve = AnimationCurve.EaseInOut(0f, 1f, 1f, 0f);
         }
- 
-        Instance = this;
- 
-        if (persistAcrossScenes)
-            DontDestroyOnLoad(gameObject);
- 
-        EnsureDefaultLevels();
-    }
- 
-    private void Start()
-    {
-        if (autoDiscoverEmitters)
-            DiscoverAndRegisterAll();
- 
-        SetImmersionLevel(initialImmersionLevel);
-    }
- 
-    // ─────────────────────────────────────────────
-    //  API pública
-    // ─────────────────────────────────────────────
- 
-    /// <summary>Cambia el nivel de inmersión y lo aplica a todos los emitters registrados.</summary>
-    public void SetImmersionLevel(int level)
-    {
-        int clamped = NormalizeLevel(level);
-        if (clamped == currentLevel) return;
- 
-        currentLevel = clamped;
-        ApplyLevel(currentLevel);
-        Debug.Log($"[AudioManager] Nivel → {currentLevel}" +
-                  (currentLevel > 0 ? $" ({immersionLevels[currentLevel - 1].levelName})" : " (Silencio)"));
-    }
- 
-    /// <summary>Registra un SoundEmitter. Llamado automáticamente por cada emitter en Start().</summary>
-    public void RegisterEmitter(SoundEmitter emitter)
-    {
-        if (emitter == null || registeredEmitters.Contains(emitter)) return;
- 
-        registeredEmitters.Add(emitter);
-        ApplyConfigToEmitter(emitter, currentLevel);
-    }
- 
-    /// <summary>Desregistra un SoundEmitter. Llamado en OnDestroy del emitter.</summary>
-    public void UnregisterEmitter(SoundEmitter emitter)
-    {
-        registeredEmitters.Remove(emitter);
-    }
- 
-    /// <summary>Devuelve el primer SoundEmitter registrado con el soundId indicado. Null si no existe.</summary>
-    public SoundEmitter GetEmitterById(string soundId)
-    {
-        if (string.IsNullOrWhiteSpace(soundId)) return null;
- 
-        foreach (SoundEmitter emitter in registeredEmitters)
+     
+        // ─────────────────────────────────────────────
+        //  Inspector
+        // ─────────────────────────────────────────────
+        [Header("Nivel de Inmersión Auditiva")]
+        [Tooltip("Nivel activo al iniciar la escena (0 = sin audio).")]
+        [SerializeField, Range(0, 6)]
+        private int initialImmersionLevel = 0;
+     
+        [Tooltip("Configuraciones de cada nivel de inmersión. Índice 0 = Nivel 1, índice 1 = Nivel 2, etc.")]
+        [SerializeField]
+        private List<ImmersionLevelConfig> immersionLevels = new List<ImmersionLevelConfig>();
+     
+        [Header("Comportamiento")]
+        [Tooltip("Si está activo, busca y registra todos los SoundEmitters en la escena al Start.")]
+        [SerializeField]
+        private bool autoDiscoverEmitters = true;
+     
+        [Tooltip("Si está activo, este GameObject no se destruye al cargar una nueva escena.")]
+        [SerializeField]
+        private bool persistAcrossScenes = false;
+     
+        [Header("Clips de Compatibilidad (MuseumElement)")]
+        [SerializeField] private AudioClip objectSelectedClip;
+        [SerializeField] private AudioClip objectDeselectedClip;
+        [SerializeField] private AudioMixerGroup outputMixerGroup;
+        [SerializeField, Min(0.01f)] private float oneShotMinDistance = 0.5f;
+        [SerializeField, Min(0.01f)] private float oneShotMaxDistance = 12f;
+     
+        [Header("Filtro por Sala (Opcional)")]
+        [Tooltip("Si está activo, solo sonarán emitters cuyos RoomId estén en la lista permitida.")]
+        [SerializeField] private bool filterEmittersByRoomId = false;
+     
+        [Tooltip("Habilita todas las salas de una vez, ignorando la lista de IDs. " +
+                 "Útil cuando tenés muchas salas y no querés cargarlas una por una.")]
+        [SerializeField] private bool enableAllRooms = true;
+     
+        [Tooltip("IDs de sala permitidos cuando el filtro está activo y enableAllRooms = false.")]
+        [SerializeField] private List<int> enabledRoomIds = new List<int>();
+     
+        // ─────────────────────────────────────────────
+        //  Estado interno
+        // ─────────────────────────────────────────────
+        private readonly List<SoundEmitter> registeredEmitters = new List<SoundEmitter>();
+        private int currentLevel = 0;
+     
+        /// <summary>Nivel de inmersión auditiva actualmente aplicado (0–6).</summary>
+        public int CurrentImmersionLevel => currentLevel;
+     
+        // ─────────────────────────────────────────────
+        //  Unity
+        // ─────────────────────────────────────────────
+        private void Awake()
         {
-            if (emitter != null && emitter.SoundId == soundId)
-                return emitter;
+            if (Instance != null && Instance != this)
+            {
+                Debug.LogWarning("[AudioManager] Ya existe una instancia. Destruyendo duplicado.", this);
+                Destroy(gameObject);
+                return;
+            }
+     
+            Instance = this;
+     
+            if (persistAcrossScenes)
+                DontDestroyOnLoad(gameObject);
+     
+            EnsureDefaultLevels();
         }
- 
-        return null;
-    }
- 
-    /// <summary>Devuelve todos los SoundEmitters registrados con el soundId indicado.</summary>
-    public List<SoundEmitter> GetAllEmittersById(string soundId)
-    {
-        List<SoundEmitter> result = new List<SoundEmitter>();
-        if (string.IsNullOrWhiteSpace(soundId)) return result;
- 
-        foreach (SoundEmitter emitter in registeredEmitters)
+     
+        private void Start()
         {
-            if (emitter != null && emitter.SoundId == soundId)
-                result.Add(emitter);
+            if (autoDiscoverEmitters)
+                DiscoverAndRegisterAll();
+     
+            SetImmersionLevel(initialImmersionLevel);
         }
- 
-        return result;
-    }
- 
-    /// <summary>Desactiva todos los emitters con el soundId indicado.</summary>
-    public void DeactivateEmitterById(string soundId)
-    {
-        foreach (SoundEmitter emitter in GetAllEmittersById(soundId))
-            emitter.Deactivate();
-    }
-
-    /// <summary>Devuelve la configuración del nivel indicado (0 devuelve null).</summary>
-    public ImmersionLevelConfig GetLevelConfig(int level)
-    {
-        int normalized = NormalizeLevel(level);
-        if (normalized <= 0) return null;
-        return immersionLevels[normalized - 1];
-    }
- 
-    /// <summary>Compatibilidad con MuseumElement.</summary>
-    public void PlayObjectSelectedSound(Vector3 position)   => PlayCompatibilityOneShot(objectSelectedClip, position);
- 
-    /// <summary>Compatibilidad con MuseumElement.</summary>
-    public void PlayObjectDeselectedSound(Vector3 position) => PlayCompatibilityOneShot(objectDeselectedClip, position);
- 
-    // ─────────────────────────────────────────────
-    //  Lógica interna
-    // ─────────────────────────────────────────────
- 
-    private void ApplyLevel(int level)
-    {
-        currentLevel = NormalizeLevel(level);
-        registeredEmitters.RemoveAll(e => e == null);
- 
-        foreach (SoundEmitter emitter in registeredEmitters)
+     
+        // ─────────────────────────────────────────────
+        //  API pública
+        // ─────────────────────────────────────────────
+     
+        /// <summary>Cambia el nivel de inmersión y lo aplica a todos los emitters registrados.</summary>
+        public void SetImmersionLevel(int level)
+        {
+            int clamped = NormalizeLevel(level);
+            if (clamped == currentLevel) return;
+     
+            currentLevel = clamped;
+            ApplyLevel(currentLevel);
+            Debug.Log($"[AudioManager] Nivel → {currentLevel}" +
+                      (currentLevel > 0 ? $" ({immersionLevels[currentLevel - 1].levelName})" : " (Silencio)"));
+        }
+     
+        /// <summary>Registra un SoundEmitter. Llamado automáticamente por cada emitter en Start().</summary>
+        public void RegisterEmitter(SoundEmitter emitter)
+        {
+            if (emitter == null || registeredEmitters.Contains(emitter)) return;
+     
+            registeredEmitters.Add(emitter);
             ApplyConfigToEmitter(emitter, currentLevel);
-    }
- 
-    private void ApplyConfigToEmitter(SoundEmitter emitter, int level)
-    {
-        int normalized = NormalizeLevel(level);
- 
-        if (normalized <= 0)
-        {
-            emitter.Deactivate();
-            return;
         }
- 
-        ImmersionLevelConfig config = immersionLevels[normalized - 1];
-        bool shouldBeActive = normalized >= emitter.MinImmersionLevel && IsRoomEnabledForEmitter(emitter);
- 
-        if (shouldBeActive)
-            emitter.Activate(config);
-        else
-            emitter.Deactivate();
-    }
- 
-    private int NormalizeLevel(int level)
-    {
-        int max = immersionLevels != null ? immersionLevels.Count : 0;
-        return Mathf.Clamp(level, 0, max);
-    }
- 
-    private bool IsRoomEnabledForEmitter(SoundEmitter emitter)
-    {
-        if (!filterEmittersByRoomId) return true;
-        if (emitter == null) return false;
-        if (enableAllRooms) return true;
- 
-        int id = emitter.RoomId;
-        return id > 0 && enabledRoomIds != null && enabledRoomIds.Contains(id);
-    }
- 
-    /// <summary>Habilita todas las salas de una vez sin modificar la lista de IDs.</summary>
-    public void EnableAllRooms()
-    {
-        enableAllRooms = true;
-        ApplyLevel(currentLevel);
-    }
- 
-    /// <summary>
-    /// Habilita solo las salas indicadas. Desactiva enableAllRooms automáticamente.
-    /// </summary>
-    public void SetEnabledRooms(List<int> roomIds)
-    {
-        enableAllRooms = false;
-        enabledRoomIds = roomIds ?? new List<int>();
-        ApplyLevel(currentLevel);
-    }
- 
-    /// <summary>Agrega una sala a la lista de habilitadas en runtime.</summary>
-    public void EnableRoom(int roomId)
-    {
-        enableAllRooms = false;
-        if (!enabledRoomIds.Contains(roomId))
-            enabledRoomIds.Add(roomId);
-        ApplyLevel(currentLevel);
-    }
- 
-    /// <summary>Quita una sala de la lista de habilitadas en runtime.</summary>
-    public void DisableRoom(int roomId)
-    {
-        enableAllRooms = false;
-        enabledRoomIds.Remove(roomId);
-        ApplyLevel(currentLevel);
-    }
- 
-    private void DiscoverAndRegisterAll()
-    {
-        SoundEmitter[] found = FindObjectsOfType<SoundEmitter>(includeInactive: true);
-        foreach (SoundEmitter emitter in found)
-            RegisterEmitter(emitter);
- 
-        Debug.Log($"[AudioManager] Emitters descubiertos: {found.Length}");
-    }
- 
-    private void PlayCompatibilityOneShot(AudioClip clip, Vector3 position)
-    {
-        if (clip == null || currentLevel <= 0) return;
- 
-        ImmersionLevelConfig config = GetLevelConfig(currentLevel);
-        if (config == null) return;
- 
-        GameObject obj = new GameObject($"{clip.name}_OneShot");
-        obj.transform.position = position;
- 
-        AudioSource src = obj.AddComponent<AudioSource>();
-        src.clip              = clip;
-        src.outputAudioMixerGroup = outputMixerGroup;
-        src.playOnAwake       = false;
-        src.loop              = false;
-        src.volume            = config.globalVolume;
-        src.spatialBlend      = config.spatialBlend;
-        src.spread            = config.spread;
-        src.dopplerLevel      = config.dopplerLevel;
-        src.rolloffMode       = config.rolloffMode;
-        src.spatialize        = config.spatialize;
-        src.minDistance       = oneShotMinDistance;
-        src.maxDistance       = oneShotMaxDistance;
- 
-        src.Play();
-        Destroy(obj, clip.length + 0.1f);
-    }
- 
-    /// <summary>
-    /// Popula la lista con los 6 niveles por defecto si está vacía,
-    /// siguiendo el modelo del Prototipo P003 de MOTIONS.
-    /// spread: 0 = muy direccional (ideal niveles altos); 180 = menos direccional.
-    /// spatialize: true activa HRTF en niveles 5 y 6.
-    /// </summary>
-    private void EnsureDefaultLevels()
-    {
-        if (immersionLevels.Count > 0) return;
- 
-        immersionLevels.Add(new ImmersionLevelConfig
+     
+        /// <summary>Desregistra un SoundEmitter. Llamado en OnDestroy del emitter.</summary>
+        public void UnregisterEmitter(SoundEmitter emitter)
         {
-            levelName    = "Nivel 1 · Mono 22050 Hz",
-            stereo       = false,
-            globalVolume = 0.6f,
-            spatialBlend = 0f,
-            spread       = 180f,
-            dopplerLevel = 0f,
-            rolloffMode  = AudioRolloffMode.Linear,
-            spatialize   = false
-        });
-        immersionLevels.Add(new ImmersionLevelConfig
-        {
-            levelName    = "Nivel 2 · Mono 32000 Hz",
-            stereo       = false,
-            globalVolume = 0.7f,
-            spatialBlend = 0f,
-            spread       = 180f,
-            dopplerLevel = 0f,
-            rolloffMode  = AudioRolloffMode.Linear,
-            spatialize   = false
-        });
-        immersionLevels.Add(new ImmersionLevelConfig
-        {
-            levelName    = "Nivel 3 · Stereo 44100 Hz",
-            stereo       = true,
-            globalVolume = 0.8f,
-            spatialBlend = 0.4f,
-            spread       = 90f,
-            dopplerLevel = 0f,
-            rolloffMode  = AudioRolloffMode.Logarithmic,
-            spatialize   = false
-        });
-        immersionLevels.Add(new ImmersionLevelConfig
-        {
-            levelName    = "Nivel 4 · Stereo 48000 Hz 3D",
-            stereo       = true,
-            globalVolume = 0.9f,
-            spatialBlend = 1f,
-            spread       = 30f,
-            dopplerLevel = 0f,
-            rolloffMode  = AudioRolloffMode.Logarithmic,
-            spatialize   = false
-        });
-        immersionLevels.Add(new ImmersionLevelConfig
-        {
-            levelName    = "Nivel 5 · Stereo 88200 Hz 3D + Doppler + HRTF",
-            stereo       = true,
-            globalVolume = 1f,
-            spatialBlend = 1f,
-            spread       = 0f,
-            dopplerLevel = 1f,
-            rolloffMode  = AudioRolloffMode.Logarithmic,
-            spatialize   = true
-        });
-        immersionLevels.Add(new ImmersionLevelConfig
-        {
-            levelName    = "Nivel 6 · Stereo 96000 Hz 3D + Doppler máx + HRTF",
-            stereo       = true,
-            globalVolume = 1f,
-            spatialBlend = 1f,
-            spread       = 0f,
-            dopplerLevel = 3f,
-            rolloffMode  = AudioRolloffMode.Logarithmic,
-            spatialize   = true
-        });
-    }
- 
-#if UNITY_EDITOR
-    [ContextMenu("Aplicar nivel actual (Editor)")]
-    private void EditorApplyCurrentLevel()
-    {
-        DiscoverAndRegisterAll();
-        ApplyLevel(initialImmersionLevel);
-        Debug.Log($"[AudioManager] Nivel {initialImmersionLevel} aplicado desde el Editor.");
-    }
- 
-    [ContextMenu("Listar emitters registrados")]
-    private void EditorListEmitters()
-    {
-        Debug.Log($"[AudioManager] {registeredEmitters.Count} emitters registrados:");
-        foreach (var e in registeredEmitters)
-        {
-            if (e != null)
-                Debug.Log($"  → {e.name}  tipo={e.EmitterType}  minLevel={e.MinImmersionLevel}");
+            registeredEmitters.Remove(emitter);
         }
+     
+        /// <summary>Devuelve el primer SoundEmitter registrado con el soundId indicado. Null si no existe.</summary>
+        public SoundEmitter GetEmitterById(string soundId)
+        {
+            if (string.IsNullOrWhiteSpace(soundId)) return null;
+     
+            foreach (SoundEmitter emitter in registeredEmitters)
+            {
+                if (emitter != null && emitter.SoundId == soundId)
+                    return emitter;
+            }
+     
+            return null;
+        }
+     
+        /// <summary>Devuelve todos los SoundEmitters registrados con el soundId indicado.</summary>
+        public List<SoundEmitter> GetAllEmittersById(string soundId)
+        {
+            List<SoundEmitter> result = new List<SoundEmitter>();
+            if (string.IsNullOrWhiteSpace(soundId)) return result;
+     
+            foreach (SoundEmitter emitter in registeredEmitters)
+            {
+                if (emitter != null && emitter.SoundId == soundId)
+                    result.Add(emitter);
+            }
+     
+            return result;
+        }
+     
+        /// <summary>Desactiva todos los emitters con el soundId indicado.</summary>
+        public void DeactivateEmitterById(string soundId)
+        {
+            foreach (SoundEmitter emitter in GetAllEmittersById(soundId))
+                emitter.Deactivate();
+        }
+    
+        /// <summary>Devuelve la configuración del nivel indicado (0 devuelve null).</summary>
+        public ImmersionLevelConfig GetLevelConfig(int level)
+        {
+            int normalized = NormalizeLevel(level);
+            if (normalized <= 0) return null;
+            return immersionLevels[normalized - 1];
+        }
+     
+        /// <summary>Compatibilidad con MuseumElement.</summary>
+        public void PlayObjectSelectedSound(Vector3 position)   => PlayCompatibilityOneShot(objectSelectedClip, position);
+     
+        /// <summary>Compatibilidad con MuseumElement.</summary>
+        public void PlayObjectDeselectedSound(Vector3 position) => PlayCompatibilityOneShot(objectDeselectedClip, position);
+     
+        // ─────────────────────────────────────────────
+        //  Lógica interna
+        // ─────────────────────────────────────────────
+     
+        private void ApplyLevel(int level)
+        {
+            currentLevel = NormalizeLevel(level);
+            registeredEmitters.RemoveAll(e => e == null);
+     
+            foreach (SoundEmitter emitter in registeredEmitters)
+                ApplyConfigToEmitter(emitter, currentLevel);
+        }
+     
+        private void ApplyConfigToEmitter(SoundEmitter emitter, int level)
+        {
+            int normalized = NormalizeLevel(level);
+     
+            if (normalized <= 0)
+            {
+                emitter.Deactivate();
+                return;
+            }
+     
+            ImmersionLevelConfig config = immersionLevels[normalized - 1];
+            bool shouldBeActive = normalized >= emitter.MinImmersionLevel && IsRoomEnabledForEmitter(emitter);
+     
+            if (shouldBeActive)
+                emitter.Activate(config);
+            else
+                emitter.Deactivate();
+        }
+     
+        private int NormalizeLevel(int level)
+        {
+            int max = immersionLevels != null ? immersionLevels.Count : 0;
+            return Mathf.Clamp(level, 0, max);
+        }
+     
+        private bool IsRoomEnabledForEmitter(SoundEmitter emitter)
+        {
+            if (!filterEmittersByRoomId) return true;
+            if (emitter == null) return false;
+            if (enableAllRooms) return true;
+     
+            int id = emitter.RoomId;
+            return id > 0 && enabledRoomIds != null && enabledRoomIds.Contains(id);
+        }
+     
+        /// <summary>Habilita todas las salas de una vez sin modificar la lista de IDs.</summary>
+        public void EnableAllRooms()
+        {
+            enableAllRooms = true;
+            ApplyLevel(currentLevel);
+        }
+     
+        /// <summary>
+        /// Habilita solo las salas indicadas. Desactiva enableAllRooms automáticamente.
+        /// </summary>
+        public void SetEnabledRooms(List<int> roomIds)
+        {
+            enableAllRooms = false;
+            enabledRoomIds = roomIds ?? new List<int>();
+            ApplyLevel(currentLevel);
+        }
+     
+        /// <summary>Agrega una sala a la lista de habilitadas en runtime.</summary>
+        public void EnableRoom(int roomId)
+        {
+            enableAllRooms = false;
+            if (!enabledRoomIds.Contains(roomId))
+                enabledRoomIds.Add(roomId);
+            ApplyLevel(currentLevel);
+        }
+     
+        /// <summary>Quita una sala de la lista de habilitadas en runtime.</summary>
+        public void DisableRoom(int roomId)
+        {
+            enableAllRooms = false;
+            enabledRoomIds.Remove(roomId);
+            ApplyLevel(currentLevel);
+        }
+     
+        private void DiscoverAndRegisterAll()
+        {
+            SoundEmitter[] found = FindObjectsOfType<SoundEmitter>(includeInactive: true);
+            foreach (SoundEmitter emitter in found)
+                RegisterEmitter(emitter);
+     
+            Debug.Log($"[AudioManager] Emitters descubiertos: {found.Length}");
+        }
+     
+        private void PlayCompatibilityOneShot(AudioClip clip, Vector3 position)
+        {
+            if (clip == null || currentLevel <= 0) return;
+     
+            ImmersionLevelConfig config = GetLevelConfig(currentLevel);
+            if (config == null) return;
+     
+            GameObject obj = new GameObject($"{clip.name}_OneShot");
+            obj.transform.position = position;
+     
+            AudioSource src = obj.AddComponent<AudioSource>();
+            src.clip              = clip;
+            src.outputAudioMixerGroup = outputMixerGroup;
+            src.playOnAwake       = false;
+            src.loop              = false;
+            src.volume            = config.globalVolume;
+            src.spatialBlend      = config.spatialBlend;
+            src.spread            = config.spread;
+            src.dopplerLevel      = config.dopplerLevel;
+            src.rolloffMode       = config.rolloffMode;
+            src.spatialize        = config.spatialize;
+            src.minDistance       = oneShotMinDistance;
+            src.maxDistance       = oneShotMaxDistance;
+     
+            src.Play();
+            Destroy(obj, clip.length + 0.1f);
+        }
+     
+        /// <summary>
+        /// Popula la lista con los 6 niveles por defecto si está vacía,
+        /// siguiendo el modelo del Prototipo P003 de MOTIONS.
+        /// spread: 0 = muy direccional (ideal niveles altos); 180 = menos direccional.
+        /// spatialize: true activa HRTF en niveles 5 y 6.
+        /// </summary>
+        private void EnsureDefaultLevels()
+        {
+            if (immersionLevels.Count > 0) return;
+     
+            immersionLevels.Add(new ImmersionLevelConfig
+            {
+                levelName    = "Nivel 1 · Mono 22050 Hz",
+                stereo       = false,
+                globalVolume = 0.6f,
+                spatialBlend = 0f,
+                spread       = 180f,
+                dopplerLevel = 0f,
+                rolloffMode  = AudioRolloffMode.Linear,
+                spatialize   = false
+            });
+            immersionLevels.Add(new ImmersionLevelConfig
+            {
+                levelName    = "Nivel 2 · Mono 32000 Hz",
+                stereo       = false,
+                globalVolume = 0.7f,
+                spatialBlend = 0f,
+                spread       = 180f,
+                dopplerLevel = 0f,
+                rolloffMode  = AudioRolloffMode.Linear,
+                spatialize   = false
+            });
+            immersionLevels.Add(new ImmersionLevelConfig
+            {
+                levelName    = "Nivel 3 · Stereo 44100 Hz",
+                stereo       = true,
+                globalVolume = 0.8f,
+                spatialBlend = 0.4f,
+                spread       = 90f,
+                dopplerLevel = 0f,
+                rolloffMode  = AudioRolloffMode.Logarithmic,
+                spatialize   = false
+            });
+            immersionLevels.Add(new ImmersionLevelConfig
+            {
+                levelName    = "Nivel 4 · Stereo 48000 Hz 3D",
+                stereo       = true,
+                globalVolume = 0.9f,
+                spatialBlend = 1f,
+                spread       = 30f,
+                dopplerLevel = 0f,
+                rolloffMode  = AudioRolloffMode.Logarithmic,
+                spatialize   = false
+            });
+            immersionLevels.Add(new ImmersionLevelConfig
+            {
+                levelName    = "Nivel 5 · Stereo 88200 Hz 3D + Doppler + HRTF",
+                stereo       = true,
+                globalVolume = 1f,
+                spatialBlend = 1f,
+                spread       = 0f,
+                dopplerLevel = 1f,
+                rolloffMode  = AudioRolloffMode.Logarithmic,
+                spatialize   = true
+            });
+            immersionLevels.Add(new ImmersionLevelConfig
+            {
+                levelName    = "Nivel 6 · Stereo 96000 Hz 3D + Doppler máx + HRTF",
+                stereo       = true,
+                globalVolume = 1f,
+                spatialBlend = 1f,
+                spread       = 0f,
+                dopplerLevel = 3f,
+                rolloffMode  = AudioRolloffMode.Logarithmic,
+                spatialize   = true
+            });
+        }
+     
+    #if UNITY_EDITOR
+        [ContextMenu("Aplicar nivel actual (Editor)")]
+        private void EditorApplyCurrentLevel()
+        {
+            DiscoverAndRegisterAll();
+            ApplyLevel(initialImmersionLevel);
+            Debug.Log($"[AudioManager] Nivel {initialImmersionLevel} aplicado desde el Editor.");
+        }
+     
+        [ContextMenu("Listar emitters registrados")]
+        private void EditorListEmitters()
+        {
+            Debug.Log($"[AudioManager] {registeredEmitters.Count} emitters registrados:");
+            foreach (var e in registeredEmitters)
+            {
+                if (e != null)
+                    Debug.Log($"  → {e.name}  tipo={e.EmitterType}  minLevel={e.MinImmersionLevel}");
+            }
+        }
+    #endif
     }
-#endif
 }

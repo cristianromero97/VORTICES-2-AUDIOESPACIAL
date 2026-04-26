@@ -27,7 +27,7 @@ namespace Vortices
         // Auxiliary References
         private SpawnController spawnController;
 
-        private void Update()
+        private new void Update()
         {
             base.Update();
             if (movingOperationRunning == true && spawnController != null && spawnController.movingOperationRunning == false)
