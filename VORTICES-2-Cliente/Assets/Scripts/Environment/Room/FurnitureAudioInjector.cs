@@ -32,8 +32,8 @@ namespace Vortices
             [Tooltip("Volumen base del emisor para esta sala (0–1).")]
             [Range(0f, 1f)] public float baseVolume = 1f;
     
-            [Tooltip("Nivel mínimo de inmersión para activar el sonido en esta sala (1–6).")]
-            [Range(1, 6)] public int minImmersionLevel = 2;
+            [Tooltip("Nivel mínimo de configuración para activar el sonido en esta sala (1–6).")]
+            [Range(1, 6)] public int minConfigLevel = 2;
     
             [Tooltip("Distancia mínima de audio 3D (metros).")]
             [Min(0f)] public float minDistance = 1f;
@@ -106,7 +106,7 @@ namespace Vortices
                 emitterType,
                 roomOverride.audioClip,
                 roomOverride.baseVolume,
-                roomOverride.minImmersionLevel,
+                roomOverride.minConfigLevel,
                 roomOverride.minDistance,
                 roomOverride.maxDistance,
                 roomIndex,

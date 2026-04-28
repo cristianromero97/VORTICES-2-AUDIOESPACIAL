@@ -6,7 +6,7 @@ namespace Vortices
 {
      
     /// <summary>
-    /// AudioManager: Controla los niveles de inmersión auditiva según el modelo definido en el
+    /// AudioManager: Controla los niveles de configuración auditiva según el modelo definido en el
     /// Prototipo P003 de MOTIONS. Gestiona todos los SoundEmitters registrados en la escena.
     ///
     /// NIVELES DE INMERSIÓN AUDITIVA (basados en MOTIONS P003):
@@ -35,10 +35,10 @@ namespace Vortices
         public static AudioManager Instance { get; private set; }
      
         // ─────────────────────────────────────────────
-        //  Configuración de un nivel de inmersión
+        //  Configuración de un nivel de configuración
         // ─────────────────────────────────────────────
         [System.Serializable]
-        public class ImmersionLevelConfig
+        public class AcousticProfile
         {
             [Tooltip("Nombre descriptivo del nivel (solo referencia).")]
             public string levelName = "Nivel";
@@ -82,14 +82,14 @@ namespace Vortices
         // ─────────────────────────────────────────────
         //  Inspector
         // ─────────────────────────────────────────────
-        [Header("Nivel de Inmersión Auditiva")]
+        [Header("Nivel de Configuración Acústica")]
         [Tooltip("Nivel activo al iniciar la escena (0 = sin audio).")]
         [SerializeField, Range(0, 6)]
-        private int initialImmersionLevel = 0;
+        private int initialConfigLevel = 0;
      
-        [Tooltip("Configuraciones de cada nivel de inmersión. Índice 0 = Nivel 1, índice 1 = Nivel 2, etc.")]
+        [Tooltip("Configuraciones de cada nivel de configuración. Índice 0 = Nivel 1, índice 1 = Nivel 2, etc.")]
         [SerializeField]
-        private List<ImmersionLevelConfig> immersionLevels = new List<ImmersionLevelConfig>();
+        private List<AcousticProfile> acousticProfiles = new List<AcousticProfile>();
      
         [Header("Comportamiento")]
         [Tooltip("Si está activo, busca y registra todos los SoundEmitters en la escena al Start.")]
@@ -124,8 +124,8 @@ namespace Vortices
         private readonly List<SoundEmitter> registeredEmitters = new List<SoundEmitter>();
         private int currentLevel = 0;
      
-        /// <summary>Nivel de inmersión auditiva actualmente aplicado (0–6).</summary>
-        public int CurrentImmersionLevel => currentLevel;
+        /// <summary>Nivel de configuración auditiva actualmente aplicado (0–6).</summary>
+        public int CurrentConfigLevel => currentLevel;
      
         // ─────────────────────────────────────────────
         //  Unity
@@ -152,15 +152,15 @@ namespace Vortices
             if (autoDiscoverEmitters)
                 DiscoverAndRegisterAll();
      
-            SetImmersionLevel(initialImmersionLevel);
+            SetConfigLevel(initialConfigLevel);
         }
      
         // ─────────────────────────────────────────────
         //  API pública
         // ─────────────────────────────────────────────
      
-        /// <summary>Cambia el nivel de inmersión y lo aplica a todos los emitters registrados.</summary>
-        public void SetImmersionLevel(int level)
+        /// <summary>Cambia el nivel de configuración y lo aplica a todos los emitters registrados.</summary>
+        public void SetConfigLevel(int level)
         {
             int clamped = NormalizeLevel(level);
             if (clamped == currentLevel) return;
@@ -168,7 +168,7 @@ namespace Vortices
             currentLevel = clamped;
             ApplyLevel(currentLevel);
             Debug.Log($"[AudioManager] Nivel → {currentLevel}" +
-                      (currentLevel > 0 ? $" ({immersionLevels[currentLevel - 1].levelName})" : " (Silencio)"));
+                      (currentLevel > 0 ? $" ({acousticProfiles[currentLevel - 1].levelName})" : " (Silencio)"));
         }
      
         /// <summary>Registra un SoundEmitter. Llamado automáticamente por cada emitter en Start().</summary>
@@ -223,11 +223,11 @@ namespace Vortices
         }
     
         /// <summary>Devuelve la configuración del nivel indicado (0 devuelve null).</summary>
-        public ImmersionLevelConfig GetLevelConfig(int level)
+        public AcousticProfile GetAcousticProfile(int level)
         {
             int normalized = NormalizeLevel(level);
             if (normalized <= 0) return null;
-            return immersionLevels[normalized - 1];
+            return acousticProfiles[normalized - 1];
         }
      
         /// <summary>Compatibilidad con MuseumElement.</summary>
@@ -259,8 +259,8 @@ namespace Vortices
                 return;
             }
      
-            ImmersionLevelConfig config = immersionLevels[normalized - 1];
-            bool shouldBeActive = normalized >= emitter.MinImmersionLevel && IsRoomEnabledForEmitter(emitter);
+            AcousticProfile config = acousticProfiles[normalized - 1];
+            bool shouldBeActive = normalized >= emitter.MinConfigLevel && IsRoomEnabledForEmitter(emitter);
      
             if (shouldBeActive)
                 emitter.Activate(config);
@@ -270,7 +270,7 @@ namespace Vortices
      
         private int NormalizeLevel(int level)
         {
-            int max = immersionLevels != null ? immersionLevels.Count : 0;
+            int max = acousticProfiles != null ? acousticProfiles.Count : 0;
             return Mathf.Clamp(level, 0, max);
         }
      
@@ -331,7 +331,7 @@ namespace Vortices
         {
             if (clip == null || currentLevel <= 0) return;
      
-            ImmersionLevelConfig config = GetLevelConfig(currentLevel);
+            AcousticProfile config = GetAcousticProfile(currentLevel);
             if (config == null) return;
      
             GameObject obj = new GameObject($"{clip.name}_OneShot");
@@ -363,9 +363,9 @@ namespace Vortices
         /// </summary>
         private void EnsureDefaultLevels()
         {
-            if (immersionLevels.Count > 0) return;
+            if (acousticProfiles.Count > 0) return;
      
-            immersionLevels.Add(new ImmersionLevelConfig
+            acousticProfiles.Add(new AcousticProfile
             {
                 levelName    = "Nivel 1 · Mono 22050 Hz",
                 stereo       = false,
@@ -376,7 +376,7 @@ namespace Vortices
                 rolloffMode  = AudioRolloffMode.Linear,
                 spatialize   = false
             });
-            immersionLevels.Add(new ImmersionLevelConfig
+            acousticProfiles.Add(new AcousticProfile
             {
                 levelName    = "Nivel 2 · Mono 32000 Hz",
                 stereo       = false,
@@ -387,7 +387,7 @@ namespace Vortices
                 rolloffMode  = AudioRolloffMode.Linear,
                 spatialize   = false
             });
-            immersionLevels.Add(new ImmersionLevelConfig
+            acousticProfiles.Add(new AcousticProfile
             {
                 levelName    = "Nivel 3 · Stereo 44100 Hz",
                 stereo       = true,
@@ -398,7 +398,7 @@ namespace Vortices
                 rolloffMode  = AudioRolloffMode.Logarithmic,
                 spatialize   = false
             });
-            immersionLevels.Add(new ImmersionLevelConfig
+            acousticProfiles.Add(new AcousticProfile
             {
                 levelName    = "Nivel 4 · Stereo 48000 Hz 3D",
                 stereo       = true,
@@ -409,7 +409,7 @@ namespace Vortices
                 rolloffMode  = AudioRolloffMode.Logarithmic,
                 spatialize   = false
             });
-            immersionLevels.Add(new ImmersionLevelConfig
+            acousticProfiles.Add(new AcousticProfile
             {
                 levelName    = "Nivel 5 · Stereo 88200 Hz 3D + Doppler + HRTF",
                 stereo       = true,
@@ -420,7 +420,7 @@ namespace Vortices
                 rolloffMode  = AudioRolloffMode.Logarithmic,
                 spatialize   = true
             });
-            immersionLevels.Add(new ImmersionLevelConfig
+            acousticProfiles.Add(new AcousticProfile
             {
                 levelName    = "Nivel 6 · Stereo 96000 Hz 3D + Doppler máx + HRTF",
                 stereo       = true,
@@ -438,8 +438,8 @@ namespace Vortices
         private void EditorApplyCurrentLevel()
         {
             DiscoverAndRegisterAll();
-            ApplyLevel(initialImmersionLevel);
-            Debug.Log($"[AudioManager] Nivel {initialImmersionLevel} aplicado desde el Editor.");
+            ApplyLevel(initialConfigLevel);
+            Debug.Log($"[AudioManager] Nivel {initialConfigLevel} aplicado desde el Editor.");
         }
      
         [ContextMenu("Listar emitters registrados")]
@@ -449,7 +449,7 @@ namespace Vortices
             foreach (var e in registeredEmitters)
             {
                 if (e != null)
-                    Debug.Log($"  → {e.name}  tipo={e.EmitterType}  minLevel={e.MinImmersionLevel}");
+                    Debug.Log($"  → {e.name}  tipo={e.EmitterType}  minLevel={e.MinConfigLevel}");
             }
         }
     #endif

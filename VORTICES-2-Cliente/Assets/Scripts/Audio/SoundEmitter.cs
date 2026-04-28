@@ -4,7 +4,7 @@ using System.Collections;
 namespace Vortices
 {
     /// <summary>
-    /// SoundEmitter: Componente de emisión de sonido 3D gestionado por el sistema de inmersión.
+    /// SoundEmitter: Componente de emisión de sonido 3D gestionado por el sistema de configuración acústica.
     ///
     /// MODOS DE REPRODUCCIÓN:
     ///   loop = true  → bucle infinito (comportamiento original).
@@ -45,7 +45,7 @@ namespace Vortices
                  "0 = una sola vez, 2 = dos veces, etc.")]
         [SerializeField, Min(0)] private int playCount = 0;
  
-        [Tooltip("¿Reproducir automáticamente cuando el nivel de inmersión lo active?")]
+        [Tooltip("¿Reproducir automáticamente cuando el nivel de configuración lo active?")]
         [SerializeField] private bool playOnActivate = true;
  
         [Header("Espacialización")]
@@ -66,7 +66,7 @@ namespace Vortices
         private SoundEmitterType emitterType       = SoundEmitterType.Generic;
         private AudioClip        audioClip;
         private float            baseVolume        = 1f;
-        private int              minImmersionLevel = 2;
+        private int              minConfigLevel = 2;
         private float            minDistance       = 1f;
         private float            maxDistance       = 12f;
         private int              roomId            = -1;
@@ -77,7 +77,7 @@ namespace Vortices
         // ─────────────────────────────────────────────
  
         public SoundEmitterType EmitterType       => emitterType;
-        public int              MinImmersionLevel => minImmersionLevel;
+        public int              MinConfigLevel => minConfigLevel;
         public bool             IsActive          => isActive;
         public int              RoomId            => roomId;
         public string           SoundId           => soundId;
@@ -110,7 +110,7 @@ namespace Vortices
         //  API — llamada por AudioManager
         // ─────────────────────────────────────────────
  
-        public void Activate(AudioManager.ImmersionLevelConfig config)
+        public void Activate(AudioManager.AcousticProfile config)
         {
             if (audioClip == null) return;
  
@@ -169,7 +169,7 @@ namespace Vortices
             SoundEmitterType type,
             AudioClip        clip,
             float            volume,
-            int              immersionLevel,
+            int              configLevel,
             float            minDist,
             float            maxDist,
             int              assignedRoomId  = -1,
@@ -180,7 +180,7 @@ namespace Vortices
             emitterType       = type;
             audioClip         = clip;
             baseVolume        = Mathf.Clamp01(volume);
-            minImmersionLevel = Mathf.Clamp(immersionLevel, 1, 6);
+            minConfigLevel = Mathf.Clamp(configLevel, 1, 6);
             minDistance       = Mathf.Max(0f, minDist);
             maxDistance       = Mathf.Max(minDistance + 0.01f, maxDist);
             roomId            = assignedRoomId;
@@ -216,7 +216,7 @@ namespace Vortices
             baseVolume = Mathf.Clamp01(volume);
             if (!isActive || AudioManager.Instance == null) return;
  
-            var config = AudioManager.Instance.GetLevelConfig(AudioManager.Instance.CurrentImmersionLevel);
+            var config = AudioManager.Instance.GetAcousticProfile(AudioManager.Instance.CurrentConfigLevel);
             if (config != null)
                 audioSource.volume = baseVolume * config.globalVolume;
         }
@@ -239,7 +239,7 @@ namespace Vortices
             }
  
             // Terminadas las N reproducciones — el emitter queda activo pero en silencio
-            // (el AudioManager lo puede reactivar si sube/baja el nivel de inmersión)
+            // (el AudioManager lo puede reactivar si sube/baja el nivel de configuración)
             isActive = false;
             playCountCoroutine = null;
         }
@@ -290,7 +290,7 @@ namespace Vortices
             string playMode = loop ? "loop" : (playCount <= 1 ? "x1" : $"x{playCount}");
             UnityEditor.Handles.Label(
                 transform.position + Vector3.up * (maxDistance * 0.15f + 0.5f),
-                $"[{emitterType}] {playMode}  min={minDistance}m  max={maxDistance}m  minLevel={minImmersionLevel}");
+                $"[{emitterType}] {playMode}  min={minDistance}m  max={maxDistance}m  minLevel={minConfigLevel}");
         }
 #endif
     }
