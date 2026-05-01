@@ -129,9 +129,9 @@ namespace Vortices
             audioSource.maxDistance  = maxDistance;
             audioSource.spatialize   = config.spatialize;
  
-            if (config.rolloffMode == AudioRolloffMode.Custom && config.customRolloffCurve != null)
-                audioSource.SetCustomCurve(AudioSourceCurveType.CustomRolloff, config.customRolloffCurve);
- 
+        if (config.rolloffMode == AudioRolloffMode.Custom && config.customRolloffCurve != null && config.customRolloffCurve.length > 0) 
+        audioSource.SetCustomCurve(AudioSourceCurveType.CustomRolloff, config.customRolloffCurve);
+
             if (!playOnActivate) return;
  
             StopPlayCountCoroutine();

@@ -8,25 +8,25 @@ using UnityEngine;
 using UnityEngine.ProBuilder;
 using UnityEngine.SceneManagement;
 using Vortices;
-
+ 
 // Loads addons as Asset bundles in Unity
 public class AddonsController : MonoBehaviour
 {
     // Data
     public List<Addon> allAddonsData;
-
+ 
     public string filePath;
     public string addonsPath;
     public List<EnvironmentObject> environmentObjects;
-
+ 
     public EnvironmentObject currentEnvironmentObject;
-
+ 
     // Coroutine
-
+ 
     // Properties
-
+ 
     public static AddonsController instance;
-
+ 
     #region Initialize
     public void Initialize()
     {
@@ -36,19 +36,19 @@ public class AddonsController : MonoBehaviour
             Destroy(gameObject);
             return;
         }
-
+ 
         instance = this;
         DontDestroyOnLoad(gameObject);
-
+ 
         // Create JSON
         filePath = Path.GetDirectoryName(Application.dataPath) + "/addons.json";
         addonsPath = Path.GetDirectoryName(Application.dataPath) + "/Addons";
-
+ 
         // Create file to communicate with launcher if there is none
         SaveAddonData();
         // Load Addons Data
         LoadAddonData();
-
+ 
         // Test bundle environment scene transition
         /*LoadAddonObjects();
         currentEnvironmentObject = environmentObjects[0];
@@ -56,26 +56,26 @@ public class AddonsController : MonoBehaviour
         */
     }
     #endregion
-
+ 
     #region Data operations
-
+ 
     private AddonsData GenerateBaseAddonData()
     {
         AddonsData addonsData = new AddonsData();
-
+ 
         addonsData.addonsData = new AddonData();
         addonsData.addonsData.addons = new List<Addon>();
-
+ 
         // For each folder in addons it will add every addon of every type
-
+ 
         string[] folderPaths = Directory.GetDirectories(addonsPath);
         List<string> folderNames = new List<string>(); 
-
+ 
         foreach (string folderPath in folderPaths)
         {
             folderNames.Add(Path.GetFileName(folderPath));
         }
-
+ 
         foreach (string folderName in folderNames)
         {
             string addonFolderPath = addonsPath + "/" + folderName;
@@ -84,7 +84,7 @@ public class AddonsController : MonoBehaviour
             {
                 // Add environment addon for files with the same starting part, for environment it should be two files
                 List<List<string>> environmentAddonGroups = FileUtilities.GetGroupedFilenamesInDirectory(addonFolderPath, ".bundle");
-
+ 
                 foreach (List<string> environmentAddonGroup in environmentAddonGroups)
                 {
                     // Fill environment addon
@@ -92,7 +92,7 @@ public class AddonsController : MonoBehaviour
                     environmentAddon.addonFileNames = new List<string>();
                     environmentAddon.addonType = "Environment";
                     environmentAddon.addonId = id++;
-
+ 
                     long totalAddonSize = 0;
                     // Panel
                     string bundlePath = Path.Combine(addonFolderPath, environmentAddonGroup[0]);
@@ -117,37 +117,60 @@ public class AddonsController : MonoBehaviour
                     {
                         sceneBundle.Unload(false);
                     }
-
+ 
                     environmentAddon.addonName = assetNameWithoutExtension;
                     environmentAddon.addonSize = SizeFormatter.FormatSize(totalAddonSize);
-
+ 
                     addonsData.addonsData.addons.Add(environmentAddon);
                 }
             }
         }
         return addonsData;
     }
-
+ 
     #endregion
-
+ 
     #region Environment Addons
     public void SetEnvironment(int index)
     {
         currentEnvironmentObject = environmentObjects[index];
     }
-
+ 
+    /// <summary>
+    /// Registra un entorno built-in (escena ya compilada en el build).
+    /// Llamado desde SessionController después de cargar los addons externos.
+    /// </summary>
+    public void RegisterBuiltInEnvironment(string environmentName, GameObject panel)
+    {
+        // Evitar duplicados
+        foreach (EnvironmentObject existing in environmentObjects)
+        {
+            if (existing.environmentName == environmentName) return;
+        }
+ 
+        EnvironmentObject builtIn = new EnvironmentObject();
+        builtIn.environmentName = environmentName;
+        builtIn.panel           = panel;
+        builtIn.isBuiltIn       = true;
+        environmentObjects.Add(builtIn);
+    }
+ 
     public void ClearEnvironment()
     {
         foreach (EnvironmentObject environmentObject in environmentObjects)
         {
-            environmentObject.sceneBundle.Unload(false);
+            // Los entornos built-in no tienen sceneBundle que descargar
+            if (!environmentObject.isBuiltIn && environmentObject.sceneBundle != null)
+            {
+                environmentObject.sceneBundle.Unload(false);
+            }
         }
     }
-
+ 
     #endregion
-
+ 
     #region Addon Loading
-
+ 
     // Load Addons into the application using <AssetBundles> (Only prefabs)
     public void LoadAddonObjects()
     {
@@ -160,7 +183,7 @@ public class AddonsController : MonoBehaviour
             {
                 continue;
             }
-
+ 
             if (addon.addonType == "Environment")
             {
                 // Found Addon is an Environment, load objects as such
@@ -169,37 +192,46 @@ public class AddonsController : MonoBehaviour
                 string bundleName = "";
                 string bundlePath = "";
                 environmentObject.environmentName = addon.addonName;
-
+ 
                 // Panel
                 bundleName = addon.addonFileNames[0];
                 bundlePath = Path.Combine(environmentBundlePaths, bundleName);
                 AssetBundle panelBundle = AssetBundle.LoadFromFile(bundlePath);
+                if (panelBundle == null)
+                {
+                    Debug.LogWarning($"[AddonsController] No se pudo cargar el bundle: {bundlePath}. Se omite este entorno.");
+                    continue;
+                }
                 string panelName = panelBundle.GetAllAssetNames()[0];
                 environmentObject.panel = panelBundle.LoadAsset<GameObject>(panelName);
-                if(panelBundle != null)
-                {
-                    panelBundle.Unload(false);
-                }
+                panelBundle.Unload(false);
                 environmentObjects.Add(environmentObject);
             }
         }
     }
-
+ 
     public void LoadEnvironmentScene()
     {
+        // Los entornos built-in no necesitan cargar un bundle —
+        // su escena ya está compilada en el build y se carga por nombre directamente.
+        if (currentEnvironmentObject.isBuiltIn)
+        {
+            return;
+        }
+ 
         foreach (Addon addon in allAddonsData)
         {
             if (!addon.enabled)
             {
                 continue;
             }
-
+ 
             if (addon.addonType == "Environment" && addon.addonName == currentEnvironmentObject.environmentName)
             {
                 string environmentBundlePaths = addonsPath + "/Environment";
                 string bundleName = "";
                 string bundlePath = "";
-
+ 
                 // Scene
                 bundleName = addon.addonFileNames[1];
                 bundlePath = Path.Combine(environmentBundlePaths, bundleName);
@@ -207,12 +239,12 @@ public class AddonsController : MonoBehaviour
             }
         }
     }
-
-
+ 
+ 
     #endregion
-
+ 
     #region Persistence
-
+ 
     private void SaveAddonData()
     {
         if (!File.Exists(filePath) || JsonChecker.IsJsonEmpty(filePath))
@@ -220,41 +252,41 @@ public class AddonsController : MonoBehaviour
             // If there is no file, create a dummy with one addon of each type supported
             AddonsData addonsData = GenerateBaseAddonData();
             string json = JsonConvert.SerializeObject(addonsData);
-
+ 
             File.WriteAllText(filePath, json);
         }
     }
-
+ 
     private void LoadAddonData()
     {
         if (!File.Exists(filePath) || JsonChecker.IsJsonEmpty(filePath))
         {
             return;
         }
-
+ 
         string json = File.ReadAllText(filePath);
-
+ 
         // Load all data to overwrite
         allAddonsData = JsonConvert.DeserializeObject<AddonsData>(json).addonsData.addons;
     }
-
+ 
     #endregion
 }
-
+ 
 #region Persistence Classes
-
+ 
 [Serializable]
 public class AddonsData
 {
     public AddonData addonsData;
 }
-
+ 
 [Serializable]
 public class AddonData
 {
     public List<Addon> addons;
 }
-
+ 
 [Serializable]
 public class Addon
 {
@@ -265,13 +297,17 @@ public class Addon
     public bool enabled;
     public List<string> addonFileNames;
 }
-
+ 
 [Serializable]
 public class EnvironmentObject
 {
     public string environmentName;
     public GameObject panel;
     public AssetBundle sceneBundle;
+    /// <summary>
+    /// Si es true, la escena está compilada en el build y no necesita cargarse desde un bundle.
+    /// </summary>
+    public bool isBuiltIn = false;
 }
-
+ 
 #endregion

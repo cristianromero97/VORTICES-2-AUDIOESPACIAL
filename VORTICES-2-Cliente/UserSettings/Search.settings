@@ -10,7 +10,7 @@ scopes = {
 	"last_search.2138236A" = "Assets"
 	"OpenInspectorPreview.2138236A" = "0"
 	"currentGroup.2138236A" = "asset"
-	"last_search.DD5CDD96" = ""
+	"last_search.DD5CDD96" = "Circular Panel"
 	"OpenInspectorPreview.DD5CDD96" = "0"
 	"currentGroup.DD5CDD96" = "scene"
 }
@@ -59,6 +59,7 @@ providers = {
 objectSelectors = {
 }
 recentSearches = [
+	"Sal"
 ]
 searchItemFavorites = [
 ]
