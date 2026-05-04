@@ -279,6 +279,11 @@ namespace Vortices
         public void LoadEnvironments()
         {
             AddonsController.instance.LoadAddonObjects();
+
+            // Registrar Sala como entorno built-in (reemplaza la versión del bundle si existe)
+            if (salaPanelPrefab != null)
+                AddonsController.instance.RegisterBuiltInEnvironment("Sala Environment", salaPanelPrefab);
+
             // Load prefab to configuration menu
             for (int i = 0; i < AddonsController.instance.environmentObjects.Count; i++)
             {
@@ -288,7 +293,6 @@ namespace Vortices
                 UIEnvironment environmentToggle = Instantiate(environmenTogglePrefab, environmentScrollviewContent.transform).GetComponentInChildren<UIEnvironment>();
                 environmentToggle.Initialize(i, this, AddonsController.instance.environmentObjects[i]);
             }
- 
         }
         public void SetEnvironment(Toggle environmentToggle, int environmentId)
         {

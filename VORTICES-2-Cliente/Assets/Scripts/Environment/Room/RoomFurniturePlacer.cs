@@ -76,6 +76,48 @@ namespace Vortices
         [SerializeField] private FurnitureAudioInjector audioInjector;
     
         // ─────────────────────────────────────────────
+        //  API pública — cálculo de objetos
+        // ─────────────────────────────────────────────
+ 
+        /// <summary>
+        /// Calcula cuántos objetos de cada tipo se instanciarían para un número de salas dado.
+        /// Devuelve un diccionario: nombre del prefab → cantidad total.
+        /// </summary>
+        public Dictionary<string, int> CalculateObjectCounts(int roomCount)
+        {
+            Dictionary<string, int> counts = new Dictionary<string, int>();
+            if (furniturePlacements == null) return counts;
+ 
+            for (int roomIndex = 1; roomIndex <= roomCount; roomIndex++)
+            {
+                int side = roomIndex % 2 == 0 ? -1 : 1;
+                foreach (FurniturePlacement placement in furniturePlacements)
+                {
+                    if (placement == null || placement.prefab == null) continue;
+                    if (!string.IsNullOrWhiteSpace(placement.placeOnTopOfId)) continue;
+                    if (!ShouldPlaceInRoom(placement, roomIndex, side)) continue;
+ 
+                    string prefabName = placement.prefab.name;
+                    if (!counts.ContainsKey(prefabName))
+                        counts[prefabName] = 0;
+                    counts[prefabName]++;
+                }
+            }
+            return counts;
+        }
+ 
+        /// <summary>
+        /// Calcula el total de objetos para un número de salas dado.
+        /// </summary>
+        public int CalculateTotalObjects(int roomCount)
+        {
+            int total = 0;
+            foreach (var pair in CalculateObjectCounts(roomCount))
+                total += pair.Value;
+            return total;
+        }
+ 
+        // ─────────────────────────────────────────────
         //  API pública (llamada por CorridorRoomsGenerator)
         // ─────────────────────────────────────────────
     

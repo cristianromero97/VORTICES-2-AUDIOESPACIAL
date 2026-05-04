@@ -142,12 +142,17 @@ public class AddonsController : MonoBehaviour
     /// </summary>
     public void RegisterBuiltInEnvironment(string environmentName, GameObject panel)
     {
-        // Evitar duplicados
-        foreach (EnvironmentObject existing in environmentObjects)
+        // Si ya existe en la lista (cargado desde bundle), reemplazar con el prefab built-in
+        for (int i = 0; i < environmentObjects.Count; i++)
         {
-            if (existing.environmentName == environmentName) return;
+            if (environmentObjects[i].environmentName == environmentName)
+            {
+                environmentObjects[i].panel     = panel;
+                environmentObjects[i].isBuiltIn = true;
+                return;
+            }
         }
- 
+
         EnvironmentObject builtIn = new EnvironmentObject();
         builtIn.environmentName = environmentName;
         builtIn.panel           = panel;

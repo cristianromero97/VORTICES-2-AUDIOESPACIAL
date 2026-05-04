@@ -89,7 +89,7 @@ namespace Vortices
      
         [Tooltip("Configuraciones de cada nivel de configuración. Índice 0 = Nivel 1, índice 1 = Nivel 2, etc.")]
         [SerializeField]
-        private List<AcousticProfile> acousticProfiles = new List<AcousticProfile>();
+        public  List<AcousticProfile> acousticProfiles = new List<AcousticProfile>();
      
         [Header("Comportamiento")]
         [Tooltip("Si está activo, busca y registra todos los SoundEmitters en la escena al Start.")]

@@ -154,6 +154,27 @@ namespace Vortices
                     circularPanel.ChangeComponentBrowserMode();
                 }
             }
+            else if (environmentName == "Sala")
+            {
+                SalaPanel salaPanel = null;
+                while (salaPanel == null || !salaPanel.gameObject.activeInHierarchy)
+                {
+                    salaPanel = FindObjectsOfType<SalaPanel>(true).FirstOrDefault();
+                    if (salaPanel != null && salaPanel.gameObject.activeInHierarchy)
+                    {
+                        break;
+                    }
+                    timeout -= Time.deltaTime;
+                    if (timeout <= 0)
+                    {
+                        Debug.LogError("[ERROR] Timeout esperando a que SalaPanel se active.");
+                        yield break;
+                    }
+                    yield return null;
+                }
+
+                Debug.Log("[DEBUG] SalaPanel activado correctamente.");
+            }
             else
             {
                 Debug.LogWarning($"[WARNING] Environment '{environmentName}' no reconocido. No se aplicará cambio automático de Browsing Mode.");

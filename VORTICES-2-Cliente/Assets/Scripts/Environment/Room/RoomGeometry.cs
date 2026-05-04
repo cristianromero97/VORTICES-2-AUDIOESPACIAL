@@ -73,6 +73,23 @@ namespace Vortices
         }
  
 #if UNITY_EDITOR
+        private void OnEnable()
+        {
+            UnityEditor.EditorApplication.playModeStateChanged += OnPlayModeChanged;
+        }
+ 
+        private void OnDisable()
+        {
+            UnityEditor.EditorApplication.playModeStateChanged -= OnPlayModeChanged;
+        }
+ 
+        private void OnPlayModeChanged(UnityEditor.PlayModeStateChange state)
+        {
+            // Al salir de Play, regenera automáticamente el escenario en el Editor
+            if (state == UnityEditor.PlayModeStateChange.EnteredEditMode)
+                RegenerateScenario();
+        }
+ 
         private void OnValidate()
         {
             if (roomCount > maxRooms)
@@ -84,6 +101,45 @@ namespace Vortices
         // ─────────────────────────────────────────────
         //  API pública
         // ─────────────────────────────────────────────
+ 
+        /// <summary>
+        /// Calcula el total de objetos que se generarían con el roomCount actual.
+        /// Llamado por SalaPanel en el Step 1.
+        /// </summary>
+        public int GetTotalObjectCount()
+        {
+            if (furniturePlacer == null) return 0;
+            int safeCount = Mathf.Clamp(roomCount, 1, maxRooms);
+            return furniturePlacer.CalculateTotalObjects(safeCount);
+        }
+ 
+        /// <summary>
+        /// Devuelve el conteo de objetos por tipo de prefab para el roomCount actual.
+        /// Llamado por SalaPanel en el Step 3.
+        /// </summary>
+        public System.Collections.Generic.Dictionary<string, int> GetObjectCountsByType()
+        {
+            if (furniturePlacer == null)
+                return new System.Collections.Generic.Dictionary<string, int>();
+            int safeCount = Mathf.Clamp(roomCount, 1, maxRooms);
+            return furniturePlacer.CalculateObjectCounts(safeCount);
+        }
+ 
+        /// <summary>
+        /// Aplica roomCount y maxRooms desde el SalaPanel antes de generar.
+        /// </summary>
+        public void SetRoomConfig(int minRooms, int maxRoomsValue)
+        {
+            roomCount = Mathf.Max(1, minRooms);
+            maxRooms  = Mathf.Max(roomCount, maxRoomsValue);
+        }
+ 
+        [ContextMenu("Regenerate Scenario")]
+        public void RegenerateScenario()
+        {
+            ClearGeneratedScenario();
+            GenerateScenario();
+        }
  
         [ContextMenu("Generate Scenario")]
         public void GenerateScenario()
@@ -297,6 +353,12 @@ namespace Vortices
  
             GameObject root = new GameObject(GeneratedRootName);
             root.transform.SetParent(transform, false);
+ 
+            // En el Editor, marcamos el objeto con DontSave para que Unity
+            // lo destruya automáticamente al entrar a Play mode.
+            if (!Application.isPlaying)
+                root.hideFlags = HideFlags.DontSave;
+ 
             return root.transform;
         }
  

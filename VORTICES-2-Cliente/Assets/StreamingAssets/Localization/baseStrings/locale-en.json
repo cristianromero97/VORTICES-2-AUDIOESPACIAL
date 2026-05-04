@@ -70,5 +70,8 @@
 
     "loading": "Loading...",
 
-    "empty": ""
+    "empty": "",
+
+    "roomTitle": "Configure the rooms in the environment",
+    "roomDescription": "You can choose the minimum and maximum number of rooms within the environment.\nYou will also be shown the total number of objects found."
 }

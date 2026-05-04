@@ -48,12 +48,15 @@ namespace Vortices
             categoryController = GameObject.FindObjectOfType<CategoryController>();
             sessionController = GameObject.FindObjectOfType<SessionController>();
 
+            if (categoryController != null)
+            {
             // When initialized will try to load categories, will create a new category list otherwise
             categories = categoryController.GetCategories();
             // Categories will be added to UI Components
             UpdateCategories();
             // Update UI with selected categories
             GetSelectedCategories();
+            }
         }
 
         #region Data Operation;
@@ -72,7 +75,8 @@ namespace Vortices
             // Remove from UI component
             RemoveCategoryFromScrollView(category);
             // Save all categories to file
-            categoryController.UpdateCategoriesList(categories);
+            if (categoryController != null)
+                categoryController.UpdateCategoriesList(categories);
         }
 
         private void UpdateCategories()
@@ -175,7 +179,8 @@ namespace Vortices
             UpdateCategories();
 
             // Removes category from data
-            sessionManager.categoryController.DeleteCategory(sessionManager.sessionName, category.categoryName);
+            if (sessionManager != null && sessionManager.categoryController != null)
+                sessionManager.categoryController.DeleteCategory(sessionManager.sessionName, category.categoryName);
 
             categoryToDelete = null;
         }
