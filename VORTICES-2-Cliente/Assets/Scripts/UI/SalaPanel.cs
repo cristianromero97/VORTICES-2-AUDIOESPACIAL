@@ -60,6 +60,10 @@ namespace Vortices
         private int   emitterMinConfigLevel = 2;
         private float emitterMinDistance    = 1f;
         private float emitterMaxDistance    = 20f;
+
+        // Step 5 — Room Filter
+        private bool roomFilterEnabled = false;
+        private int  roomFilterMode    = 0; // 0=Todas, 1=Pares, 2=Impares
  
         // Step 6/7 — actividades
         public int activityType { get; set; } = 0;
@@ -110,6 +114,13 @@ namespace Vortices
         [SerializeField] private TMP_InputField  minConfigLevelInput;
         [SerializeField] private TMP_InputField  minDistanceInput;
         [SerializeField] private TMP_InputField  maxDistanceInput;
+
+        [Header("Step 5 - Room Filter")]
+        [SerializeField] private Toggle     roomFilterToggle;
+        [SerializeField] private GameObject roomFilterModeContainer;
+        [SerializeField] private Toggle     allRoomsToggle;
+        [SerializeField] private Toggle     evenRoomsToggle;
+        [SerializeField] private Toggle     oddRoomsToggle;
  
         // ─────────────────────────────────────────────
         //  Inspector — Step 6: Activity Direction
@@ -149,6 +160,7 @@ namespace Vortices
 
             SetupStep4Defaults();
             SetupStep5Defaults();
+            SetupStep5RoomFilter();
             OnRoomConfigChanged();
         }
  
@@ -264,42 +276,69 @@ namespace Vortices
         /// </summary>
         public void LoadObjectSelectionUI()
         {
-            if (objectListContent == null || objectRowPrefab == null) return;
-            if (roomGeometry == null && furniturePlacerConfig == null) return;
+            Debug.Log("[SalaPanel] LoadObjectSelectionUI llamado");
+
+            if (objectListContent == null)
+            {
+                Debug.LogError("[SalaPanel] objectListContent es NULL");
+                return;
+            }
+            if (objectRowPrefab == null)
+            {
+                Debug.LogError("[SalaPanel] objectRowPrefab es NULL");
+                return;
+            }
+            if (roomGeometry == null && furniturePlacerConfig == null)
+            {
+                Debug.LogError("[SalaPanel] roomGeometry Y furniturePlacerConfig son NULL");
+                return;
+            }
 
             objectCounts = roomGeometry != null
                 ? roomGeometry.GetObjectCountsByType()
                 : furniturePlacerConfig.CalculateObjectCounts(minRooms);
+
+            Debug.Log($"[SalaPanel] Objetos encontrados: {objectCounts.Count} tipos");
+            foreach (var pair in objectCounts)
+                Debug.Log($"  - {pair.Key}: {pair.Value}");
+
             objectSelected = new Dictionary<string, bool>();
- 
+
             // Limpiar filas anteriores
             foreach (Transform child in objectListContent)
                 Destroy(child.gameObject);
- 
+
             foreach (var pair in objectCounts)
             {
                 string prefabName = pair.Key;
                 int    count      = pair.Value;
                 objectSelected[prefabName] = false;
- 
+
                 GameObject row      = Instantiate(objectRowPrefab, objectListContent);
                 Toggle     toggle   = row.GetComponentInChildren<Toggle>();
                 TextMeshProUGUI label  = row.transform.Find("Label")?.GetComponent<TextMeshProUGUI>();
                 TextMeshProUGUI counter = row.transform.Find("Counter")?.GetComponent<TextMeshProUGUI>();
                 Button deleteBtn    = row.transform.Find("DeleteButton")?.GetComponent<Button>();
- 
+
                 if (label   != null) label.text   = prefabName;
                 if (counter != null) counter.text = $"({count})";
- 
+
+                Debug.Log($"[SalaPanel] Fila creada para {prefabName}");
+
                 // Capturar para el closure
                 string capturedName = prefabName;
+                Image rowBackground = row.GetComponent<Image>();
                 if (toggle != null)
                     toggle.onValueChanged.AddListener(isOn =>
                     {
                         objectSelected[capturedName] = isOn;
+                        if (rowBackground != null)
+                            rowBackground.color = isOn
+                                ? new Color(0.369f, 0.812f, 0.812f, 0.3f)  // teal semitransparente
+                                : new Color(1f, 1f, 1f, 0.05f);            // blanco casi transparente
                         UpdateObjectSelectionStatus();
                     });
- 
+
                 if (deleteBtn != null)
                     deleteBtn.onClick.AddListener(() =>
                     {
@@ -309,7 +348,7 @@ namespace Vortices
                         UpdateObjectSelectionStatus();
                     });
             }
- 
+
             UpdateObjectSelectionStatus();
         }
  
@@ -337,16 +376,37 @@ namespace Vortices
         //  Step 4 — Immersion Config
         // ─────────────────────────────────────────────
  
+        // Valores por defecto de los 6 niveles (mismos que AudioManager.EnsureDefaultLevels)
+        private static readonly string[] DefaultLevelNames = {
+            "Nivel 1 · Mono 22050 Hz",
+            "Nivel 2 · Mono 32000 Hz",
+            "Nivel 3 · Stereo 44100 Hz",
+            "Nivel 4 · Stereo 48000 Hz 3D",
+            "Nivel 5 · Stereo 88200 Hz 3D + Doppler + HRTF",
+            "Nivel 6 · Stereo 96000 Hz 3D + Doppler máx + HRTF"
+        };
+        private static readonly float[] DefaultSpatialBlend = { 0f,   0f,   0.4f, 1f,  1f,  1f   };
+        private static readonly float[] DefaultSpread       = { 180f, 180f, 90f,  30f, 0f,  0f   };
+        private static readonly float[] DefaultDoppler      = { 0f,   0f,   0f,   0f,  1f,  3f   };
+        private static readonly int[]   DefaultRolloff      = { 1,    1,    0,    2,   2,   2    }; // 0=Logarithmic,1=Linear,2=Custom
+        private static readonly bool[]  DefaultSpatialize   = { false,false,false,false,true,true };
+
         private void SetupStep4Defaults()
         {
-            if (audioManager == null) return;
- 
             if (configLevelDropdown != null)
             {
                 configLevelDropdown.ClearOptions();
-                List<string> options = new List<string>();
-                for (int i = 1; i <= audioManager.acousticProfiles.Count; i++)
-                    options.Add($"Level {i} — {audioManager.acousticProfiles[i - 1].levelName}");
+                var options = new List<string>();
+                if (audioManager != null)
+                {
+                    for (int i = 1; i <= audioManager.acousticProfiles.Count; i++)
+                        options.Add($"Level {i} — {audioManager.acousticProfiles[i - 1].levelName}");
+                }
+                else
+                {
+                    for (int i = 0; i < DefaultLevelNames.Length; i++)
+                        options.Add($"Level {i + 1} — {DefaultLevelNames[i]}");
+                }
                 configLevelDropdown.AddOptions(options);
                 configLevelDropdown.value = configLevel - 1;
                 configLevelDropdown.onValueChanged.AddListener(v =>
@@ -355,36 +415,70 @@ namespace Vortices
                     RefreshImmersionSliders();
                 });
             }
- 
+
             RefreshImmersionSliders();
         }
- 
+
         private void RefreshImmersionSliders()
         {
-            if (audioManager == null || configLevel < 1) return;
-            var profile = audioManager.GetAcousticProfile(configLevel);
-            if (profile == null) return;
- 
-            if (spatialBlendSlider != null) spatialBlendSlider.value = profile.spatialBlend;
-            if (spreadSlider       != null) spreadSlider.value       = profile.spread;
-            if (dopplerSlider      != null) dopplerSlider.value      = profile.dopplerLevel;
-            if (spatializeToggle   != null) spatializeToggle.isOn    = profile.spatialize;
-            if (rolloffModeDropdown != null)
-                rolloffModeDropdown.value = (int)profile.rolloffMode;
+            if (configLevel < 1) return;
+            int idx = Mathf.Clamp(configLevel - 1, 0, DefaultLevelNames.Length - 1);
+
+            float spatialBlend, spread, doppler;
+            bool  spatialize;
+            int   rolloff;
+
+            if (audioManager != null)
+            {
+                var profile = audioManager.GetAcousticProfile(configLevel);
+                if (profile == null) return;
+                spatialBlend = profile.spatialBlend;
+                spread       = profile.spread;
+                doppler      = profile.dopplerLevel;
+                spatialize   = profile.spatialize;
+                rolloff      = (int)profile.rolloffMode;
+            }
+            else
+            {
+                spatialBlend = DefaultSpatialBlend[idx];
+                spread       = DefaultSpread[idx];
+                doppler      = DefaultDoppler[idx];
+                spatialize   = DefaultSpatialize[idx];
+                rolloff      = DefaultRolloff[idx];
+            }
+
+            if (spatialBlendSlider  != null) spatialBlendSlider.value  = spatialBlend;
+            if (spreadSlider        != null) spreadSlider.value        = spread;
+            if (dopplerSlider       != null) dopplerSlider.value       = doppler;
+            if (spatializeToggle    != null) spatializeToggle.isOn     = spatialize;
+            if (rolloffModeDropdown != null) rolloffModeDropdown.value = rolloff;
+
         }
- 
-        /// <summary>Aplica los cambios de los sliders al AcousticProfile activo.</summary>
+
+        private AudioManager.ProfileOverrideData ReadSliderValues()
+        {
+            int idx = Mathf.Clamp(configLevel - 1, 0, DefaultLevelNames.Length - 1);
+            return new AudioManager.ProfileOverrideData
+            {
+                spatialBlend = spatialBlendSlider  != null ? spatialBlendSlider.value  : DefaultSpatialBlend[idx],
+                spread       = spreadSlider        != null ? spreadSlider.value        : DefaultSpread[idx],
+                dopplerLevel = dopplerSlider       != null ? dopplerSlider.value       : DefaultDoppler[idx],
+                rolloffMode  = rolloffModeDropdown != null ? rolloffModeDropdown.value : DefaultRolloff[idx],
+                spatialize   = spatializeToggle    != null ? spatializeToggle.isOn     : DefaultSpatialize[idx],
+            };
+        }
+
         public void ApplyImmersionChanges()
         {
             if (audioManager == null) return;
             var profile = audioManager.GetAcousticProfile(configLevel);
             if (profile == null) return;
- 
-            if (spatialBlendSlider  != null) profile.spatialBlend  = spatialBlendSlider.value;
-            if (spreadSlider        != null) profile.spread        = spreadSlider.value;
-            if (dopplerSlider       != null) profile.dopplerLevel  = dopplerSlider.value;
-            if (spatializeToggle    != null) profile.spatialize    = spatializeToggle.isOn;
-            if (rolloffModeDropdown != null) profile.rolloffMode   = (AudioRolloffMode)rolloffModeDropdown.value;
+            var ovr = ReadSliderValues();
+            profile.spatialBlend = ovr.spatialBlend;
+            profile.spread       = ovr.spread;
+            profile.dopplerLevel = ovr.dopplerLevel;
+            profile.rolloffMode  = (AudioRolloffMode)ovr.rolloffMode;
+            profile.spatialize   = ovr.spatialize;
         }
  
         // ─────────────────────────────────────────────
@@ -407,6 +501,42 @@ namespace Vortices
             if (maxDistanceInput    != null) maxDistanceInput.text    = emitterMaxDistance.ToString();
         }
  
+        private void SetupStep5RoomFilter()
+        {
+            if (roomFilterModeContainer != null)
+                roomFilterModeContainer.SetActive(roomFilterEnabled);
+
+            if (roomFilterToggle != null)
+            {
+                roomFilterToggle.isOn = roomFilterEnabled;
+                roomFilterToggle.onValueChanged.AddListener(enabled =>
+                {
+                    roomFilterEnabled = enabled;
+                    if (roomFilterModeContainer != null)
+                        roomFilterModeContainer.SetActive(enabled);
+                });
+            }
+
+            if (allRoomsToggle  != null) allRoomsToggle.onValueChanged.AddListener(isOn  => { if (isOn) roomFilterMode = 0; });
+            if (evenRoomsToggle != null) evenRoomsToggle.onValueChanged.AddListener(isOn => { if (isOn) roomFilterMode = 1; });
+            if (oddRoomsToggle  != null) oddRoomsToggle.onValueChanged.AddListener(isOn  => { if (isOn) roomFilterMode = 2; });
+
+            // Estado inicial: Todas seleccionado
+            if (allRoomsToggle != null) allRoomsToggle.isOn = true;
+        }
+
+        private List<int> GetRoomFilterIds()
+        {
+            var ids = new List<int>();
+            for (int i = 1; i <= maxRoomsValue; i++)
+            {
+                bool isEven = (i % 2 == 0);
+                if (roomFilterMode == 1 && isEven)  ids.Add(i);
+                if (roomFilterMode == 2 && !isEven) ids.Add(i);
+            }
+            return ids;
+        }
+
         public void UpdateBaseVolumeText(float value)
         {
             emitterBaseVolume = value;
@@ -491,20 +621,28 @@ namespace Vortices
             if (roomGeometry != null)
                 roomGeometry.SetRoomConfig(minRooms, maxRoomsValue);
  
-            // Aplicar cambios del AudioManager
+            // Aplicar cambios del AudioManager (si está presente en escena)
             ApplyImmersionChanges();
             if (audioManager != null)
                 audioManager.SetConfigLevel(configLevel);
- 
+
             // Archivos de audio
             sessionManager.browsingMode = "Local";
             sessionManager.elementPaths = optionFilePath.filePaths;
             sessionManager.configLevel  = configLevel;
             sessionManager.displayMode  = "Sala";
- 
-            // Guardar config de SoundEmitter en SessionManager si tiene esos campos
-            // (se aplican en LaunchSession al iniciar la escena)
- 
+
+            // Guardar override del perfil acústico para aplicarlo en Sala Environment
+            sessionManager.hasAcousticOverride = true;
+            sessionManager.acousticOverride    = ReadSliderValues();
+
+            // Guardar filtro por sala
+            sessionManager.hasRoomFilter  = roomFilterEnabled;
+            sessionManager.roomFilterAll  = (roomFilterMode == 0);
+            sessionManager.roomFilterIds  = roomFilterEnabled && roomFilterMode != 0
+                ? GetRoomFilterIds()
+                : new List<int>();
+
             sessionManager.LaunchSession();
         }
     }

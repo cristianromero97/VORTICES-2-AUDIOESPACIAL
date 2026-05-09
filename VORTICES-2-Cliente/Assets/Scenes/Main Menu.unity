@@ -8516,7 +8516,7 @@ Mesh:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: pb_Mesh1040966
+  m_Name: pb_Mesh1744106
   serializedVersion: 10
   m_SubMeshes:
   - serializedVersion: 2
@@ -27529,7 +27529,7 @@ Mesh:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: pb_Mesh1040706
+  m_Name: pb_Mesh1743852
   serializedVersion: 10
   m_SubMeshes:
   - serializedVersion: 2
@@ -30051,6 +30051,13 @@ MonoBehaviour:
   environmentName: 
   isOnlineSession: 0
   configLevel: 4
+  hasAcousticOverride: 0
+  acousticOverride:
+    spatialBlend: 0
+    spread: 0
+    dopplerLevel: 0
+    rolloffMode: 0
+    spatialize: 0
   displayMode: 
   browsingMode: 
   volumetric: 0

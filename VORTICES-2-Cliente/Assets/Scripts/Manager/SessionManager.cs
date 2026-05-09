@@ -27,6 +27,11 @@ namespace Vortices
         public bool isOnlineSession = false;
         // Sala Environment settings
         public int configLevel = 4;
+        public bool hasAcousticOverride = false;
+        public AudioManager.ProfileOverrideData acousticOverride;
+        public bool hasRoomFilter = false;
+        public bool roomFilterAll = true;
+        public List<int> roomFilterIds = new List<int>();
         // Environment Settings
         public string displayMode;
         public string browsingMode;
@@ -326,7 +331,19 @@ namespace Vortices
             {
                 AudioManager audioManager = GameObject.FindObjectOfType<AudioManager>(true);
                 if (audioManager != null)
+                {
                     audioManager.SetConfigLevel(configLevel);
+                    if (hasAcousticOverride)
+                        audioManager.ApplyProfileOverride(configLevel, acousticOverride);
+                    if (hasRoomFilter)
+                    {
+                        audioManager.SetRoomFilterEnabled(true);
+                        if (roomFilterAll)
+                            audioManager.EnableAllRooms();
+                        else
+                            audioManager.SetEnabledRooms(roomFilterIds);
+                    }
+                }
                 else
                     Debug.LogWarning("[SessionManager] AudioManager no encontrado en Sala Environment.");
             }

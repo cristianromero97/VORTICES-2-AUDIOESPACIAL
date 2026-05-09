@@ -229,6 +229,29 @@ namespace Vortices
             if (normalized <= 0) return null;
             return acousticProfiles[normalized - 1];
         }
+
+        /// <summary>Aplica valores personalizados al perfil del nivel indicado y reaaplica el nivel actual.</summary>
+        public void ApplyProfileOverride(int level, ProfileOverrideData ovr)
+        {
+            var profile = GetAcousticProfile(level);
+            if (profile == null) return;
+            profile.spatialBlend = ovr.spatialBlend;
+            profile.spread       = ovr.spread;
+            profile.dopplerLevel = ovr.dopplerLevel;
+            profile.rolloffMode  = (AudioRolloffMode)ovr.rolloffMode;
+            profile.spatialize   = ovr.spatialize;
+            ApplyLevel(currentLevel);
+        }
+
+        [System.Serializable]
+        public struct ProfileOverrideData
+        {
+            public float spatialBlend;
+            public float spread;
+            public float dopplerLevel;
+            public int   rolloffMode;
+            public bool  spatialize;
+        }
      
         /// <summary>Compatibilidad con MuseumElement.</summary>
         public void PlayObjectSelectedSound(Vector3 position)   => PlayCompatibilityOneShot(objectSelectedClip, position);
@@ -301,6 +324,13 @@ namespace Vortices
             ApplyLevel(currentLevel);
         }
      
+        /// <summary>Activa o desactiva el filtro por sala. Si se desactiva, todas las salas suenan.</summary>
+        public void SetRoomFilterEnabled(bool enabled)
+        {
+            filterEmittersByRoomId = enabled;
+            ApplyLevel(currentLevel);
+        }
+
         /// <summary>Agrega una sala a la lista de habilitadas en runtime.</summary>
         public void EnableRoom(int roomId)
         {

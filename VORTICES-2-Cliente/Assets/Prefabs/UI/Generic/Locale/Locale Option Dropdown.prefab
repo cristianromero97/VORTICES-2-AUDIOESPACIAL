@@ -79,7 +79,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   dropdown: {fileID: 3519934306063309305}
-  closer: {fileID: 0}
   groupKey: baseStrings
   stringKey: input_binder_defaultbinding
   originalOptions: []
@@ -290,7 +289,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 1}
   m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 191.5, y: 40}
+  m_AnchoredPosition: {x: 191.5, y: 0}
   m_SizeDelta: {x: 383, y: 40}
   m_Pivot: {x: 0.5, y: 1}
 --- !u!114 &9041056506637586484
@@ -1075,7 +1074,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: '{ Default binding }'
+  m_text: 
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 862c40f5c16f9ab4a9058cb9e94f2ed3, type: 2}
   m_sharedMaterial: {fileID: 5287465342396467734, guid: 862c40f5c16f9ab4a9058cb9e94f2ed3, type: 2}
