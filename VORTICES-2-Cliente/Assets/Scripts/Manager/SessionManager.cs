@@ -32,6 +32,7 @@ namespace Vortices
         public bool hasRoomFilter = false;
         public bool roomFilterAll = true;
         public List<int> roomFilterIds = new List<int>();
+        public List<string> selectedDirections = new List<string>();
         // Environment Settings
         public string displayMode;
         public string browsingMode;

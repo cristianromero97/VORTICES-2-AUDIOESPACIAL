@@ -30058,6 +30058,10 @@ MonoBehaviour:
     dopplerLevel: 0
     rolloffMode: 0
     spatialize: 0
+  hasRoomFilter: 0
+  roomFilterAll: 1
+  roomFilterIds: 
+  selectedDirections: []
   displayMode: 
   browsingMode: 
   volumetric: 0

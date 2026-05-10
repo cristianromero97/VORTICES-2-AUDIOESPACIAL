@@ -2996,7 +2996,7 @@ MonoBehaviour:
       roomAudioOverrides:
       - roomId: 2
         soundId: 1
-        audioClip: {fileID: 8300000, guid: 27746166e9cb7cb4bbdcf91619227e13, type: 3}
+        audioClip: {fileID: 0}
         baseVolume: 0.125
         minConfigLevel: 5
         minDistance: 1

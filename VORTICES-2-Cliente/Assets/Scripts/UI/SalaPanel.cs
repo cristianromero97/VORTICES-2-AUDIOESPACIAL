@@ -65,6 +65,9 @@ namespace Vortices
         private bool roomFilterEnabled = false;
         private int  roomFilterMode    = 0; // 0=Todas, 1=Pares, 2=Impares
  
+        // Step 6 — direcciones de actividad
+        private Dictionary<string, bool> directionSelected = new Dictionary<string, bool>();
+
         // Step 6/7 — actividades
         public int activityType { get; set; } = 0;
  
@@ -130,6 +133,8 @@ namespace Vortices
         [Tooltip("Content del ScrollView donde se generan las filas de dirección.")]
         [SerializeField] private Transform directionListContent;
         [SerializeField] private TextMeshProUGUI directionSelectionStatusText;
+        [SerializeField] private GameObject directionRowPrefab;
+        [SerializeField] private TMP_InputField newDirectionInput;
  
         // ─────────────────────────────────────────────
         //  Unity
@@ -555,6 +560,74 @@ namespace Vortices
         }
  
         // ─────────────────────────────────────────────
+        //  Step 6 — Activity Direction
+        // ─────────────────────────────────────────────
+
+        public void OnAddDirectionClicked()
+        {
+            if (newDirectionInput == null) return;
+            string dirName = newDirectionInput.text.Trim();
+            if (string.IsNullOrEmpty(dirName)) return;
+            if (directionSelected.ContainsKey(dirName)) return;
+
+            AddDirectionRow(dirName);
+            newDirectionInput.text = "";
+            UpdateDirectionSelectionStatus();
+        }
+
+        private void AddDirectionRow(string directionName)
+        {
+            if (directionListContent == null || directionRowPrefab == null) return;
+
+            directionSelected[directionName] = false;
+
+            GameObject row      = Instantiate(directionRowPrefab, directionListContent);
+            Toggle     toggle   = row.GetComponentInChildren<Toggle>();
+            TextMeshProUGUI label   = row.transform.Find("Label")?.GetComponent<TextMeshProUGUI>();
+            TextMeshProUGUI counter = row.transform.Find("Counter")?.GetComponent<TextMeshProUGUI>();
+            Button deleteBtn    = row.transform.Find("DeleteButton")?.GetComponent<Button>();
+
+            if (label   != null) label.text = directionName;
+            if (counter != null) counter.gameObject.SetActive(false);
+
+            string capturedName = directionName;
+            Image rowBackground = row.GetComponent<Image>();
+
+            if (toggle != null)
+                toggle.onValueChanged.AddListener(isOn =>
+                {
+                    directionSelected[capturedName] = isOn;
+                    if (rowBackground != null)
+                        rowBackground.color = isOn
+                            ? new Color(0.369f, 0.812f, 0.812f, 0.3f)
+                            : new Color(1f, 1f, 1f, 0.05f);
+                    UpdateDirectionSelectionStatus();
+                });
+
+            if (deleteBtn != null)
+                deleteBtn.onClick.AddListener(() =>
+                {
+                    directionSelected.Remove(capturedName);
+                    Destroy(row);
+                    UpdateDirectionSelectionStatus();
+                });
+        }
+
+        private void UpdateDirectionSelectionStatus()
+        {
+            int selected = 0;
+            foreach (var pair in directionSelected)
+                if (pair.Value) selected++;
+
+            if (directionSelectionStatusText != null)
+                directionSelectionStatusText.text = selected > 0
+                    ? $"{selected} direction(s) selected — ready!"
+                    : "Select at least one direction to continue.";
+
+            BlockButton((int)SalaId.ActivityDirection);
+        }
+
+        // ─────────────────────────────────────────────
         //  BlockButton
         // ─────────────────────────────────────────────
  
@@ -591,8 +664,10 @@ namespace Vortices
                     break;
  
                 case (int)SalaId.ActivityDirection:
-                    // El Category Selection maneja su propia lógica — siempre habilitado
-                    hasToBlock = false;
+                    int selectedDirs = 0;
+                    foreach (var pair in directionSelected)
+                        if (pair.Value) selectedDirs++;
+                    hasToBlock = selectedDirs == 0;
                     break;
             }
  
@@ -635,6 +710,12 @@ namespace Vortices
             // Guardar override del perfil acústico para aplicarlo en Sala Environment
             sessionManager.hasAcousticOverride = true;
             sessionManager.acousticOverride    = ReadSliderValues();
+
+            // Guardar direcciones seleccionadas
+            var selectedDirList = new List<string>();
+            foreach (var pair in directionSelected)
+                if (pair.Value) selectedDirList.Add(pair.Key);
+            sessionManager.selectedDirections = selectedDirList;
 
             // Guardar filtro por sala
             sessionManager.hasRoomFilter  = roomFilterEnabled;
