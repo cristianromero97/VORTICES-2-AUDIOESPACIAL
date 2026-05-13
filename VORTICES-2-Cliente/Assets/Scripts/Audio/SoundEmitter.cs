@@ -196,6 +196,13 @@ namespace Vortices
         //  API — utilidades en runtime
         // ─────────────────────────────────────────────
  
+        /// <summary>Detiene la reproducción y resetea el tiempo al inicio. Usado por SonidosPanel.</summary>
+        public void ForceStop()
+        {
+            Deactivate();
+            if (audioSource != null) audioSource.time = 0f;
+        }
+
         /// <summary>Cambia el clip en runtime (ej: cambiar canal de TV).</summary>
         public void SetClip(AudioClip newClip, bool restartPlayback = true)
         {

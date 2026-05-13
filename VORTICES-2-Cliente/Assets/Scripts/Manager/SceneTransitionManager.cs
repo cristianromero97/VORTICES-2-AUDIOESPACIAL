@@ -83,7 +83,7 @@ namespace Vortices
             }
 
             operation.allowSceneActivation = true;
-            if (sceneName != "Main Menu")
+            if (sceneName != "Main Menu" && currentEnvironment?.sceneBundle != null)
             {
                 currentEnvironment.sceneBundle.Unload(false);
             }

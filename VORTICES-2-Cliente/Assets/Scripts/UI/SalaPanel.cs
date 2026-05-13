@@ -701,15 +701,34 @@ namespace Vortices
             if (audioManager != null)
                 audioManager.SetConfigLevel(configLevel);
 
+            // Step 1 — Room Config
+            sessionManager.minRooms = minRooms;
+            sessionManager.maxRooms = maxRoomsValue;
+
+            // Step 3 — Object Selection
+            var selectedTypes = new List<string>();
+            foreach (var pair in objectSelected)
+                if (pair.Value) selectedTypes.Add(pair.Key);
+            sessionManager.selectedObjectTypes = selectedTypes;
+
             // Archivos de audio
-            sessionManager.browsingMode = "Local";
-            sessionManager.elementPaths = optionFilePath.filePaths;
-            sessionManager.configLevel  = configLevel;
-            sessionManager.displayMode  = "Sala";
+            sessionManager.environmentName = "Sala";
+            sessionManager.browsingMode    = "Local";
+            sessionManager.elementPaths    = optionFilePath.filePaths;
+            sessionManager.configLevel     = configLevel;
+            sessionManager.displayMode     = "Sala";
 
             // Guardar override del perfil acústico para aplicarlo en Sala Environment
             sessionManager.hasAcousticOverride = true;
             sessionManager.acousticOverride    = ReadSliderValues();
+
+            // Step 5 — Audio Config (emitter global override)
+            OnAudioConfigChanged();
+            sessionManager.hasEmitterOverride    = true;
+            sessionManager.emitterBaseVolume     = emitterBaseVolume;
+            sessionManager.emitterMinConfigLevel = emitterMinConfigLevel;
+            sessionManager.emitterMinDistance    = emitterMinDistance;
+            sessionManager.emitterMaxDistance    = emitterMaxDistance;
 
             // Guardar direcciones seleccionadas
             var selectedDirList = new List<string>();

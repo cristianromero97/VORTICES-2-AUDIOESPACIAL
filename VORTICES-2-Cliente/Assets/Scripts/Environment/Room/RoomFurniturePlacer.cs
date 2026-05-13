@@ -206,10 +206,31 @@ namespace Vortices
     
             placedById[id] = instance;
     
-            // Delegar audio al inyector
+            // Delegar audio estático al inyector (solo si el tipo de objeto fue seleccionado)
+            bool isExplicitlySelected = SessionManager.instance != null
+                && SessionManager.instance.selectedObjectTypes != null
+                && SessionManager.instance.selectedObjectTypes.Count > 0
+                && SessionManager.instance.selectedObjectTypes.Contains(placement.prefab.name);
+
             if (audioInjector != null)
             {
-                audioInjector.InjectAudio(instance, placement.audio, roomIndex);
+                bool inject = true;
+                if (SessionManager.instance != null
+                    && SessionManager.instance.selectedObjectTypes != null
+                    && SessionManager.instance.selectedObjectTypes.Count > 0)
+                {
+                    inject = isExplicitlySelected;
+                }
+                if (inject)
+                    audioInjector.InjectAudio(instance, placement.audio, roomIndex);
+            }
+
+            // Marcar objetos seleccionados explícitamente para que SessionManager les asigne audio de usuario
+            if (isExplicitlySelected)
+            {
+                AudioTargetMarker marker = instance.AddComponent<AudioTargetMarker>();
+                marker.roomIndex  = roomIndex;
+                marker.prefabType = placement.prefab.name;
             }
     
             return instance;

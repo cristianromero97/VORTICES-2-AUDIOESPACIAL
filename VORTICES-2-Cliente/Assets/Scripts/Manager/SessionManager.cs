@@ -3,12 +3,13 @@ using System.Collections.Generic;
 using UnityEngine;
 using Mirror;
 using System.Threading.Tasks;
- 
+
 using System.Linq;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
 using UnityEngine.SceneManagement;
 using UnityEngine.InputSystem;
+using UnityEngine.Networking;
 using static System.Net.Mime.MediaTypeNames;
 using static UnityEngine.Rendering.DebugUI;
  
@@ -27,12 +28,21 @@ namespace Vortices
         public bool isOnlineSession = false;
         // Sala Environment settings
         public int configLevel = 4;
+        public int minRooms    = 1;
+        public int maxRooms    = 50;
+        public List<string> selectedObjectTypes = new List<string>();
         public bool hasAcousticOverride = false;
         public AudioManager.ProfileOverrideData acousticOverride;
         public bool hasRoomFilter = false;
         public bool roomFilterAll = true;
         public List<int> roomFilterIds = new List<int>();
         public List<string> selectedDirections = new List<string>();
+        // Step 5 — emitter global override
+        public bool  hasEmitterOverride    = false;
+        public float emitterBaseVolume     = 1f;
+        public int   emitterMinConfigLevel = 2;
+        public float emitterMinDistance    = 1f;
+        public float emitterMaxDistance    = 12f;
         // Environment Settings
         public string displayMode;
         public string browsingMode;
@@ -322,14 +332,18 @@ namespace Vortices
             loggingController = GameObject.FindObjectOfType<LoggingController>(true);
             spawnController = GameObject.FindObjectOfType<SpawnController>(true);
             righthandTools = GameObject.FindObjectOfType<RighthandTools>(true);
+
+            if (elementCategoryController != null) elementCategoryController.Initialize();
+            else Debug.LogWarning("[SessionManager] elementCategoryController no encontrado en escena.");
+            if (loggingController != null) loggingController.Initialize();
+            else Debug.LogWarning("[SessionManager] loggingController no encontrado en escena.");
+            if (spawnController != null) spawnController.Initialize();
+            else Debug.LogWarning("[SessionManager] spawnController no encontrado en escena.");
  
-            elementCategoryController.Initialize();
-            loggingController.Initialize();
-            spawnController.Initialize();
- 
-            // Inicializar AudioManager si el entorno es Sala
+            // Inicializar componentes de Sala Environment
             if (environmentName == "Sala")
             {
+                // AudioManager primero: la inyección de audio ocurre durante GenerateScenario
                 AudioManager audioManager = GameObject.FindObjectOfType<AudioManager>(true);
                 if (audioManager != null)
                 {
@@ -347,6 +361,19 @@ namespace Vortices
                 }
                 else
                     Debug.LogWarning("[SessionManager] AudioManager no encontrado en Sala Environment.");
+
+                // RoomGeometry después: aplica config y regenera la geometría + muebles
+                RoomGeometry roomGeometry = GameObject.FindObjectOfType<RoomGeometry>(true);
+                if (roomGeometry != null)
+                {
+                    roomGeometry.SetRoomConfig(minRooms, maxRooms);
+                    roomGeometry.RegenerateScenario();
+                }
+                else
+                    Debug.LogWarning("[SessionManager] RoomGeometry no encontrado en Sala Environment.");
+
+                // Asignar audio de usuario (elementPaths) a los objetos marcados por AudioTargetMarker
+                yield return StartCoroutine(AssignUserAudioCoroutine());
             }
  
             inputController.RestartInputs();
@@ -660,6 +687,155 @@ namespace Vortices
  
  
  
+        private IEnumerator AssignUserAudioCoroutine()
+        {
+            if (elementPaths == null || elementPaths.Count == 0)
+            {
+                Debug.LogWarning("[SessionManager] AssignUserAudio: elementPaths vacío, no se asigna audio de usuario.");
+                yield break;
+            }
+
+            // Esperar un frame para que Destroy() del escenario anterior se procese
+            // (generateOnStart agrega markers al escenario inicial; RegenerateScenario lo destruye con rename,
+            // pero el Destroy es diferido — sin yield return null, FindObjectsOfType los devuelve igual)
+            yield return null;
+
+            AudioTargetMarker[] allMarkers = GameObject.FindObjectsOfType<AudioTargetMarker>(true);
+
+            // Filtrar markers de objetos ya destruidos (del escenario previo pendiente de Destroy)
+            List<AudioTargetMarker> markers = new List<AudioTargetMarker>();
+            foreach (AudioTargetMarker m in allMarkers)
+                if (m != null && m.gameObject != null) markers.Add(m);
+
+            if (markers.Count == 0)
+            {
+                Debug.LogWarning("[SessionManager] AssignUserAudio: no se encontraron AudioTargetMarker válidos en la escena.");
+                yield break;
+            }
+
+            // Shuffle aleatorio de los markers (Fisher-Yates) — distinta asignación cada sesión
+            for (int i = markers.Count - 1; i > 0; i--)
+            {
+                int j = Random.Range(0, i + 1);
+                AudioTargetMarker tmp = markers[i];
+                markers[i] = markers[j];
+                markers[j] = tmp;
+            }
+
+            // Asignación 1:1 — cada archivo a un objeto diferente, sin repetir
+            int assignCount = Mathf.Min(elementPaths.Count, markers.Count);
+            Debug.Log($"[SessionManager] AssignUserAudio: {elementPaths.Count} archivo(s), {markers.Count} objeto(s) elegibles → asignando {assignCount}.");
+
+            var assignedSounds = new List<(AudioTargetMarker marker, AudioSource src)>();
+
+            for (int i = 0; i < assignCount; i++)
+            {
+                AudioTargetMarker marker = markers[i];
+                string path = elementPaths[i];
+
+                AudioClip clip = null;
+                yield return StartCoroutine(LoadAudioClipCoroutine(path, loaded => clip = loaded));
+
+                if (marker == null)
+                {
+                    Debug.LogWarning($"[SessionManager] AssignUserAudio: marker destruido durante carga de '{path}'.");
+                    continue;
+                }
+
+                if (clip == null)
+                {
+                    Debug.LogWarning($"[SessionManager] AssignUserAudio: no se pudo cargar '{path}' (Room {marker.roomIndex}).");
+                    continue;
+                }
+
+                // Crear AudioSource hijo dedicado — completamente separado del sistema AudioManager/SoundEmitter.
+                // Usar SoundEmitter causaba auto-registro → AudioManager lo activaba automáticamente.
+                GameObject audioGO = new GameObject("UserAudio");
+                audioGO.transform.SetParent(marker.transform, false);
+                AudioSource src = audioGO.AddComponent<AudioSource>();
+                src.clip        = clip;
+                src.playOnAwake = false;
+                src.loop        = true;
+                src.minDistance = emitterMinDistance;
+                src.maxDistance = emitterMaxDistance;
+
+                // Aplicar perfil acústico del Step 4 (mismo que usan los SoundEmitters del ambiente)
+                AudioManager.AcousticProfile profile = AudioManager.Instance?.GetAcousticProfile(configLevel);
+                if (profile != null)
+                {
+                    src.spatialBlend = profile.spatialBlend;
+                    src.spread       = profile.spread;
+                    src.dopplerLevel = profile.dopplerLevel;
+                    src.rolloffMode  = profile.rolloffMode;
+                    src.spatialize   = profile.spatialize;
+                    src.volume       = emitterBaseVolume * profile.globalVolume;
+                    if (profile.rolloffMode == AudioRolloffMode.Custom && profile.customRolloffCurve != null)
+                        src.SetCustomCurve(AudioSourceCurveType.CustomRolloff, profile.customRolloffCurve);
+                }
+                else
+                {
+                    // Fallback si no hay AudioManager activo (ej: test directo en Sala sin pasar por menú)
+                    src.spatialBlend = 1f;
+                    src.rolloffMode  = AudioRolloffMode.Custom;
+                    src.volume       = emitterBaseVolume;
+                }
+
+                src.Stop();
+
+                marker.audioFileName   = System.IO.Path.GetFileNameWithoutExtension(path);
+                marker.userAudioSource = src;
+
+                assignedSounds.Add((marker, src));
+                Debug.Log($"[SessionManager] AssignUserAudio: Room {marker.roomIndex} ({marker.prefabType}) ← {System.IO.Path.GetFileName(path)}");
+            }
+
+            if (markers.Count > assignCount)
+                Debug.Log($"[SessionManager] AssignUserAudio: {markers.Count - assignCount} objeto(s) sin audio (menos archivos que objetos).");
+
+            // Inicializar SonidosPanel con los sonidos asignados exitosamente
+            SonidosPanel sonidosPanel = GameObject.FindObjectOfType<SonidosPanel>(true);
+            if (sonidosPanel != null)
+                sonidosPanel.Initialize(assignedSounds);
+            else
+                Debug.LogWarning("[SessionManager] SonidosPanel no encontrado en la escena Sala.");
+        }
+
+        private IEnumerator LoadAudioClipCoroutine(string path, System.Action<AudioClip> onLoaded)
+        {
+            string uri = "file:///" + path.Replace("\\", "/");
+            AudioType audioType = GetAudioTypeFromPath(path);
+
+            using (UnityWebRequest req = UnityWebRequestMultimedia.GetAudioClip(uri, audioType))
+            {
+                yield return req.SendWebRequest();
+
+                if (req.result != UnityWebRequest.Result.Success)
+                {
+                    Debug.LogError($"[SessionManager] Error cargando audio '{path}': {req.error}");
+                    onLoaded(null);
+                }
+                else
+                {
+                    onLoaded(DownloadHandlerAudioClip.GetContent(req));
+                }
+            }
+        }
+
+        private AudioType GetAudioTypeFromPath(string path)
+        {
+            if (string.IsNullOrEmpty(path)) return AudioType.UNKNOWN;
+            string ext = System.IO.Path.GetExtension(path).ToLowerInvariant();
+            return ext switch
+            {
+                ".mp3"  => AudioType.MPEG,
+                ".wav"  => AudioType.WAV,
+                ".ogg"  => AudioType.OGGVORBIS,
+                ".aiff" => AudioType.AIFF,
+                ".aif"  => AudioType.AIFF,
+                _       => AudioType.UNKNOWN,
+            };
+        }
+
         private IEnumerator ConnectToVoiceChatCoroutine(int userId)
         {
             bool loginSuccess = false;

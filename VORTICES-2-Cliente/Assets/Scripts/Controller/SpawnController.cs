@@ -31,7 +31,9 @@ namespace Vortices
 
         public void Initialize()
         {
-            sessionManager = GameObject.Find("SessionManager").GetComponent<SessionManager>();
+            sessionManager = SessionManager.instance != null
+                ? SessionManager.instance
+                : GameObject.Find("SessionManager")?.GetComponent<SessionManager>();
             spawnGroup = GameObject.Find("Information Object Group");
             righthandTools = GameObject.FindObjectOfType<RighthandTools>(true);
         }
@@ -39,12 +41,27 @@ namespace Vortices
         #region Base Spawn
         public void StartSession(bool asSortingBase, List<string> customUrls)
         {
+            // Garantizar referencia al SessionManager aunque Initialize() haya fallado
+            if (sessionManager == null)
+                sessionManager = SessionManager.instance ?? GameObject.Find("SessionManager")?.GetComponent<SessionManager>();
+
+            if (sessionManager == null)
+            {
+                Debug.LogError("[SpawnController] SessionManager no encontrado en StartSession.");
+                return;
+            }
+
             if (!asSortingBase)
             {
                 righthandTools = GameObject.FindObjectOfType<RighthandTools>(true);
-                righthandTools.Initialize();
+                if (righthandTools != null) righthandTools.Initialize();
             }
 
+            // Sala Environment: los emitters ya están configurados, no hay spawn base
+            if (sessionManager.environmentName == "Sala")
+            {
+                return;
+            }
 
             // A fork for every environment possible
             if (sessionManager.environmentName == "Circular")

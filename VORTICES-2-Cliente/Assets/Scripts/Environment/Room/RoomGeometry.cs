@@ -174,10 +174,14 @@ namespace Vortices
         {
             Transform root = transform.Find(GeneratedRootName);
             if (root == null) return;
- 
+
 #if UNITY_EDITOR
             if (!Application.isPlaying) { DestroyImmediate(root.gameObject); return; }
 #endif
+            // Renombrar antes de destruir: Destroy() es diferido en play mode, y si no se
+            // renombra, GetOrCreateGeneratedRoot() encontrará este mismo objeto y añadirá
+            // las salas nuevas aquí — que luego serán destruidas junto con el contenedor viejo.
+            root.name = GeneratedRootName + "_Old";
             Destroy(root.gameObject);
         }
  

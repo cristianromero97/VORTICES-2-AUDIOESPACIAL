@@ -94,21 +94,34 @@ namespace Vortices
             SoundEmitter.SoundEmitterType emitterType = roomOverride.overrideEmitterType
                 ? roomOverride.emitterType
                 : SoundEmitter.SoundEmitterType.Generic;
-    
+
             // Reutilizar SoundEmitter existente en el prefab o agregar uno nuevo
             SoundEmitter emitter = instance.GetComponentInChildren<SoundEmitter>(includeInactive: true);
             if (emitter == null)
             {
                 emitter = instance.AddComponent<SoundEmitter>();
             }
-    
+
+            // Aplicar override global de Step 5 (emitter config) si está configurado
+            float finalVolume      = roomOverride.baseVolume;
+            int   finalMinLevel    = roomOverride.minConfigLevel;
+            float finalMinDistance = roomOverride.minDistance;
+            float finalMaxDistance = roomOverride.maxDistance;
+            if (SessionManager.instance != null && SessionManager.instance.hasEmitterOverride)
+            {
+                finalVolume      = SessionManager.instance.emitterBaseVolume;
+                finalMinLevel    = SessionManager.instance.emitterMinConfigLevel;
+                finalMinDistance = SessionManager.instance.emitterMinDistance;
+                finalMaxDistance = SessionManager.instance.emitterMaxDistance;
+            }
+
             emitter.Configure(
                 emitterType,
                 roomOverride.audioClip,
-                roomOverride.baseVolume,
-                roomOverride.minConfigLevel,
-                roomOverride.minDistance,
-                roomOverride.maxDistance,
+                finalVolume,
+                finalMinLevel,
+                finalMinDistance,
+                finalMaxDistance,
                 roomIndex,
                 roomOverride.soundId,
                 roomOverride.loop,

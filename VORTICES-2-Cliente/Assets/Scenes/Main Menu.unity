@@ -30051,6 +30051,9 @@ MonoBehaviour:
   environmentName: 
   isOnlineSession: 0
   configLevel: 4
+  minRooms: 1
+  maxRooms: 50
+  selectedObjectTypes: []
   hasAcousticOverride: 0
   acousticOverride:
     spatialBlend: 0
@@ -30062,6 +30065,11 @@ MonoBehaviour:
   roomFilterAll: 1
   roomFilterIds: 
   selectedDirections: []
+  hasEmitterOverride: 0
+  emitterBaseVolume: 1
+  emitterMinConfigLevel: 2
+  emitterMinDistance: 1
+  emitterMaxDistance: 20
   displayMode: 
   browsingMode: 
   volumetric: 0
