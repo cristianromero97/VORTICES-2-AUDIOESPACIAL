@@ -78,5 +78,6 @@
     "audioManagerTitle": "Configure the acoustic immersion control",
 
     "audioConfigTitle": "Configure the audio settings for the session",
-    "audioConfigDescription": "You can configure the volume, the minimum and maximum playback distance, and apply room filters."
+    "audioConfigDescription": "You can configure the volume, the minimum and maximum playback distance, and apply room filters.",
+    "tutorialActivityTitle" : "Create a direction for the tutorial activity /English only/"
 }

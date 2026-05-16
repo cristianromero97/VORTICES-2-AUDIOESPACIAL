@@ -201,7 +201,7 @@ namespace Vortices
             GameObject header = MakeImage("Header", panel.transform,
                                            new Color(0.1f, 0.2f, 0.52f, 1f), stretch: false);
             AnchorRect(header, 0f, 0.82f, 1f, 1f);
-            MakeText("HText", header.transform, "¿Cómo percibiste el sonido?", 70f,
+            MakeText("HText", header.transform, "Tutorial Activity", 70f,
                       FontStyles.Bold, TextAlignmentOptions.Center, Color.white, stretch: true);
 
             // Subtítulo
@@ -214,7 +214,7 @@ namespace Vortices
             // Pregunta
             GameObject qArea = MakeRect("QuestionArea", panel.transform);
             AnchorRect(qArea, 0f, 0.64f, 1f, 0.73f);
-            MakeText("QText", qArea.transform, "¿En qué dirección lo escuchaste?", 55f,
+            MakeText("QText", qArea.transform, "Which ear did you hear it with?", 55f,
                       FontStyles.Normal, TextAlignmentOptions.Center,
                       new Color(0.75f, 0.85f, 1f), stretch: true);
 

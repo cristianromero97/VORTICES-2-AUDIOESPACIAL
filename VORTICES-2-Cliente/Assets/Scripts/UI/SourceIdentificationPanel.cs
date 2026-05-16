@@ -1,0 +1,671 @@
+using System.Collections;
+using System.Collections.Generic;
+using System.IO;
+using UnityEngine;
+using UnityEngine.UI;
+using UnityEngine.EventSystems;
+using TMPro;
+
+namespace Vortices
+{
+    /// <summary>
+    /// SourceIdentificationPanel: Se adjunta a un GO DENTRO del Canvas de un VRPanel.
+    /// No crea Canvas propio — usa el Canvas padre del VRPanel.
+    ///
+    /// Flujo: Q1 (sala, texto) → Confirmar sala → Q2 (objeto, lista) → Confirmar objeto → Completado
+    ///
+    /// Navegación por teclado:
+    ///   Q1       → Enter en el campo envía la respuesta.
+    ///   Confirmar→ Flechas Izq/Der entre Sí y No, Enter para confirmar.
+    ///   Q2 lista → Flechas Arr/Abajo entre botones, Enter para seleccionar.
+    ///   Completado → Flechas Izq/Der entre Repetir y Finalizar, Enter.
+    /// </summary>
+    public class SourceIdentificationPanel : MonoBehaviour
+    {
+        // ─────────────────────────────────────────────
+        //  Inspector
+        // ─────────────────────────────────────────────
+        [Header("Actividad")]
+        [Tooltip("Radio XZ en metros para detectar que el jugador se acercó a un emisor.")]
+        [SerializeField] private float proximityRadius = 1.5f;
+
+        [Header("Editor / Debug")]
+        [Tooltip("Tecla para simular acercamiento al primer emisor disponible.")]
+        [SerializeField] private KeyCode simulateProximityKey = KeyCode.G;
+
+        // ─────────────────────────────────────────────
+        //  Estado
+        // ─────────────────────────────────────────────
+        private enum PanelState { Idle, Q1Room, ConfirmRoom, Q2Object, ConfirmObject, Completed }
+
+        private PanelState        _state = PanelState.Idle;
+        private AudioTargetMarker _currentMarker;
+        private string            _roomAnswer;
+        private string            _objectAnswer;
+        private readonly HashSet<AudioTargetMarker> _answered = new HashSet<AudioTargetMarker>();
+
+        // ─────────────────────────────────────────────
+        //  UI refs
+        // ─────────────────────────────────────────────
+        private CanvasGroup     _group;
+        private TextMeshProUGUI _subtitleText;
+
+        // Referencia al teclado virtual de la mano
+        private HandKeyboard _handKeyboard;
+
+        private GameObject     _q1Section;
+        private TMP_InputField _roomInputField;
+        private Button         _q1ContinueBtn;
+
+        private GameObject _objectSection;
+        private Transform  _objectListContent;
+        private RectTransform _objectContentRT;
+
+        private GameObject      _confirmSection;
+        private TextMeshProUGUI _confirmText;
+        private Button          _yesBtn;
+        private Button          _noBtn;
+
+        private GameObject _completedSection;
+        private Button     _repeatBtn;
+        private Button     _finalizeBtn;
+
+        // ─────────────────────────────────────────────
+        //  Unity lifecycle
+        // ─────────────────────────────────────────────
+        private void Awake()
+        {
+            BuildUI();
+            SetVisible(false);
+
+            // Buscar el HandKeyboard en la escena
+            _handKeyboard = FindObjectOfType<HandKeyboard>();
+            if (_handKeyboard == null)
+                Debug.LogWarning("[SourceID] HandKeyboard no encontrado en la escena");
+        }
+
+        private void Update()
+        {
+            if (Input.GetKeyDown(simulateProximityKey))
+                TryTriggerProximity(force: true);
+
+            if (_state == PanelState.Idle)
+                TryTriggerProximity(force: false);
+        }
+
+        // ─────────────────────────────────────────────
+        //  Detección de proximidad
+        // ─────────────────────────────────────────────
+        private void TryTriggerProximity(bool force)
+        {
+            if (Camera.main == null) return;
+            Vector3 cam = Camera.main.transform.position;
+
+            foreach (AudioTargetMarker marker in AudioTargetMarker.All)
+            {
+                if (marker == null || marker.userAudioSource == null) continue;
+                if (_answered.Contains(marker)) continue;
+
+                Vector3 obj  = marker.transform.position;
+                float   dist = Vector2.Distance(
+                    new Vector2(cam.x, cam.z),
+                    new Vector2(obj.x, obj.z));
+
+                if (force || dist <= proximityRadius)
+                {
+                    Trigger(marker);
+                    return;
+                }
+            }
+        }
+
+        private void Trigger(AudioTargetMarker marker)
+        {
+            _currentMarker = marker;
+            if (_subtitleText != null && !string.IsNullOrEmpty(marker.audioFileName))
+                _subtitleText.text = $"\"{marker.audioFileName}\"";
+            EnterState(PanelState.Q1Room);
+            SetVisible(true);
+        }
+
+        // ─────────────────────────────────────────────
+        //  Máquina de estados
+        // ─────────────────────────────────────────────
+        private void EnterState(PanelState s)
+        {
+            _state = s;
+
+            _q1Section.SetActive(s == PanelState.Q1Room);
+            _objectSection.SetActive(s == PanelState.Q2Object);
+            _confirmSection.SetActive(s == PanelState.ConfirmRoom || s == PanelState.ConfirmObject);
+            _completedSection.SetActive(s == PanelState.Completed);
+
+            switch (s)
+            {
+                case PanelState.Q1Room:
+                    _roomInputField.text = string.Empty;
+                    _roomInputField.ActivateInputField();
+                    Select(_roomInputField.gameObject);
+                    break;
+
+                case PanelState.ConfirmRoom:
+                    _confirmText.text = $"¿Estás seguro que el sonido proviene de la sala {_roomAnswer}?";
+                    Select(_yesBtn.gameObject);
+                    break;
+
+                case PanelState.Q2Object:
+                    StartCoroutine(BuildObjectButtonsNextFrame());
+                    break;
+
+                case PanelState.ConfirmObject:
+                    _confirmText.text = $"¿Estás seguro que el sonido proviene de: {_objectAnswer}?";
+                    Select(_yesBtn.gameObject);
+                    break;
+
+                case PanelState.Completed:
+                    Select(_repeatBtn.gameObject);
+                    break;
+            }
+        }
+
+        // ─────────────────────────────────────────────
+        //  Lista de objetos — espera un frame para que
+        //  el layout del ScrollRect esté activo antes
+        //  de calcular el tamaño del Content
+        // ─────────────────────────────────────────────
+        private IEnumerator BuildObjectButtonsNextFrame()
+        {
+            // Limpiar botones anteriores
+            for (int i = _objectListContent.childCount - 1; i >= 0; i--)
+                DestroyImmediate(_objectListContent.GetChild(i).gameObject);
+
+            yield return null; // esperar a que se destruyan
+
+            var buttons = new List<Button>();
+
+            // Mostrar TODOS los muebles de la sala, no solo los que tienen audio
+            foreach (FurnitureLabel lbl in FurnitureLabel.All)
+            {
+                if (lbl == null || lbl.roomIndex != _currentMarker.roomIndex) continue;
+
+                string captured = lbl.labelDisplayName ?? "Unknown";
+
+                GameObject rowGO = MakeRect("Row_" + captured, _objectListContent);
+                rowGO.AddComponent<LayoutElement>().preferredHeight = 120f;
+                rowGO.AddComponent<Image>().color = new Color(0.12f, 0.2f, 0.45f, 0.95f);
+
+                Button btn = rowGO.AddComponent<Button>();
+                ColorBlock cb = btn.colors;
+                cb.normalColor      = new Color(0.12f, 0.2f,  0.45f, 0.95f);
+                cb.highlightedColor = new Color(0.25f, 0.45f, 0.8f,  1f);
+                cb.pressedColor     = new Color(0.08f, 0.15f, 0.35f, 1f);
+                cb.selectedColor    = new Color(0.25f, 0.45f, 0.8f,  1f);
+                btn.colors = cb;
+
+                MakeText("Label", rowGO.transform, captured, 56f,
+                          FontStyles.Bold, TextAlignmentOptions.Center,
+                          Color.white, stretch: true);
+
+                btn.onClick.AddListener(() => OnObjectSelected(captured));
+                buttons.Add(btn);
+            }
+
+            // Calcular altura total manualmente basada en botones + layout
+            const float buttonHeight = 120f;
+            const float spacing = 18f;
+            const float padding = 16f;
+            float totalHeight = (buttons.Count * buttonHeight)
+                              + (Mathf.Max(0, buttons.Count - 1) * spacing)
+                              + padding;
+
+            // Establecer altura del Content directamente
+            _objectContentRT.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, totalHeight);
+
+            // Forzar rebuilds en cascada para propagar el layout
+            Canvas.ForceUpdateCanvases();
+            LayoutRebuilder.ForceRebuildLayoutImmediate(_objectContentRT);
+            if (_objectContentRT.parent != null)
+                LayoutRebuilder.ForceRebuildLayoutImmediate(_objectContentRT.parent as RectTransform);
+
+            Debug.Log($"[SourceID] Objetos mostrados: {buttons.Count} | room: {_currentMarker.roomIndex}");
+
+            // Navegación vertical explícita entre botones
+            for (int i = 0; i < buttons.Count; i++)
+            {
+                Navigation nav = new Navigation { mode = Navigation.Mode.Explicit };
+                if (i > 0)                  nav.selectOnUp   = buttons[i - 1];
+                if (i < buttons.Count - 1)  nav.selectOnDown = buttons[i + 1];
+                buttons[i].navigation = nav;
+            }
+
+            // Asegurar que el scroll quede al tope para que los botones sean visibles
+            ScrollRect sr = _objectListContent.GetComponentInParent<ScrollRect>();
+            if (sr != null) sr.verticalNormalizedPosition = 1f;
+
+            if (buttons.Count > 0)
+                Select(buttons[0].gameObject);
+        }
+
+        // ─────────────────────────────────────────────
+        //  Callbacks
+        // ─────────────────────────────────────────────
+        private void OnQ1Continue()
+        {
+            string answer = _roomInputField.text.Trim();
+            if (string.IsNullOrEmpty(answer)) return;
+            _roomAnswer = answer;
+            EnterState(PanelState.ConfirmRoom);
+        }
+
+        private void OnObjectSelected(string objectLabel)
+        {
+            _objectAnswer = objectLabel;
+            EnterState(PanelState.ConfirmObject);
+        }
+
+        private void OnYes()
+        {
+            if (_state == PanelState.ConfirmRoom)
+                EnterState(PanelState.Q2Object);
+            else if (_state == PanelState.ConfirmObject)
+                Finish();
+        }
+
+        private void OnNo()
+        {
+            if (_state == PanelState.ConfirmRoom)
+                EnterState(PanelState.Q1Room);
+            else if (_state == PanelState.ConfirmObject)
+                EnterState(PanelState.Q2Object);
+        }
+
+        private void Finish()
+        {
+            // Solo pasar a estado Completado, el CSV se guarda en OnFinalize
+            EnterState(PanelState.Completed);
+        }
+
+        private void OnRepeat()
+        {
+            _answered.Clear();
+            // Reiniciar fuentes de audio para que el jugador pueda volver a escuchar
+            foreach (AudioTargetMarker m in AudioTargetMarker.All)
+            {
+                if (m.userAudioSource != null && !m.userAudioSource.isPlaying)
+                    m.userAudioSource.Play();
+            }
+            SetVisible(false);
+            _state = PanelState.Idle;
+            Debug.Log("[SourceID] Actividad repetida — _answered limpiado, esperando nuevo trigger");
+        }
+
+        private void OnFinalize()
+        {
+            // Guardar la respuesta en CSV cuando se elige finalizar
+            _answered.Add(_currentMarker);
+            LogResponse();
+
+            // _answered conserva su contenido: no se vuelven a disparar triggers de este marker
+            SetVisible(false);
+            _state = PanelState.Idle;
+            Debug.Log("[SourceID] Actividad finalizada — respuesta guardada en CSV");
+        }
+
+        // ─────────────────────────────────────────────
+        //  Visibilidad
+        // ─────────────────────────────────────────────
+        private static void Select(GameObject go)
+        {
+            if (EventSystem.current != null)
+                EventSystem.current.SetSelectedGameObject(go);
+        }
+
+        private void SetVisible(bool visible)
+        {
+            if (_group == null) return;
+            _group.alpha          = visible ? 1f : 0f;
+            _group.interactable   = visible;
+            _group.blocksRaycasts = visible;
+            if (!visible) Select(null);
+        }
+
+        // ─────────────────────────────────────────────
+        //  CSV
+        // ─────────────────────────────────────────────
+        private void LogResponse()
+        {
+            if (_currentMarker == null) return;
+
+            string sessionName  = SessionManager.instance?.sessionName ?? "unknown";
+            int    userId       = SessionManager.instance?.userId      ?? -1;
+            string soundFile    = _currentMarker.audioFileName         ?? "unknown";
+            string actualObject = _currentMarker.labelDisplayName      ?? _currentMarker.prefabType ?? "unknown";
+            int    actualRoom   = _currentMarker.roomIndex;
+            string timestamp    = System.DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+
+            bool correctRoom = int.TryParse(_roomAnswer, out int rInt) && rInt == actualRoom;
+            bool correctObj  = string.Equals(_objectAnswer.Trim(), actualObject.Trim(),
+                                             System.StringComparison.OrdinalIgnoreCase);
+
+            string entry = $"{sessionName},{userId},{soundFile},{actualObject},{actualRoom}," +
+                           $"{_roomAnswer},{_objectAnswer},{correctRoom},{correctObj},{timestamp}";
+
+            Debug.Log($"[SourceIdentification] {entry}");
+
+            try
+            {
+                string folder = Path.Combine(Application.dataPath, "Results",
+                                             sessionName, userId.ToString());
+                Directory.CreateDirectory(folder);
+                string path   = Path.Combine(folder, "Source Identification.csv");
+                bool   exists = File.Exists(path);
+                using (StreamWriter sw = File.AppendText(path))
+                {
+                    if (!exists)
+                        sw.WriteLine("sessionName,userId,soundFile,actualObject,actualRoom," +
+                                     "answeredRoom,answeredObject,correctRoom,correctObject,timestamp");
+                    sw.WriteLine(entry);
+                }
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogError($"[SourceIdentification] Error al guardar CSV: {e.Message}");
+            }
+        }
+
+        // ─────────────────────────────────────────────
+        //  Construcción de UI
+        // ─────────────────────────────────────────────
+        private void BuildUI()
+        {
+            _group = GetComponent<CanvasGroup>() ?? gameObject.AddComponent<CanvasGroup>();
+
+            RectTransform rt = GetComponent<RectTransform>() ?? gameObject.AddComponent<RectTransform>();
+            rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one;
+            rt.offsetMin = Vector2.zero; rt.offsetMax = Vector2.zero;
+
+            MakeImage("Overlay", transform, new Color(0f, 0f, 0f, 0.75f), stretch: true);
+
+            // Panel central
+            GameObject panel = MakeRect("Panel", transform);
+            RectTransform panelRT = panel.GetComponent<RectTransform>();
+            panelRT.anchorMin = new Vector2(0.1f, 0.05f);
+            panelRT.anchorMax = new Vector2(0.9f, 0.95f);
+            panelRT.offsetMin = Vector2.zero;
+            panelRT.offsetMax = Vector2.zero;
+            MakeImage("PanelBG", panel.transform, new Color(0.06f, 0.06f, 0.1f, 0.97f), stretch: true);
+
+            // Header
+            GameObject header = MakeImage("Header", panel.transform,
+                                           new Color(0.1f, 0.2f, 0.52f, 1f), stretch: false);
+            AnchorRect(header, 0f, 0.84f, 1f, 1f);
+            MakeText("HText", header.transform, "Source Identification", 65f,
+                      FontStyles.Bold, TextAlignmentOptions.Center, Color.white, stretch: true);
+
+            // Subtítulo
+            GameObject sub = MakeRect("SubTitle", panel.transform);
+            AnchorRect(sub, 0f, 0.75f, 1f, 0.84f);
+            _subtitleText = MakeText("SubText", sub.transform, "", 44f, FontStyles.Italic,
+                                      TextAlignmentOptions.Center,
+                                      new Color(0.85f, 0.85f, 0.85f), stretch: true);
+
+            // ── Q1: sala ─────────────────────────────────────
+            _q1Section = MakeRect("Q1Section", panel.transform);
+            AnchorRect(_q1Section, 0.05f, 0.08f, 0.95f, 0.75f);
+
+            GameObject qRoomArea = MakeRect("QArea", _q1Section.transform);
+            AnchorRect(qRoomArea, 0f, 0.68f, 1f, 1f);
+            var qRoomTxt = MakeText("QText", qRoomArea.transform,
+                     "¿En qué sala identificaste el sonido?", 52f,
+                     FontStyles.Normal, TextAlignmentOptions.Center,
+                     new Color(0.75f, 0.85f, 1f), stretch: true);
+            qRoomTxt.overflowMode = TextOverflowModes.Overflow;
+
+            GameObject fieldArea = MakeRect("FieldArea", _q1Section.transform);
+            AnchorRect(fieldArea, 0.15f, 0.38f, 0.85f, 0.65f);
+            _roomInputField = BuildInputField(fieldArea.transform, "Número de sala...");
+            _roomInputField.onSubmit.AddListener(_ => OnQ1Continue());
+
+            // Conectar HandKeyboard: mostrar al seleccionar, ocultar al deseleccionar
+            if (_handKeyboard != null)
+            {
+                _roomInputField.onSelect.AddListener(_ => _handKeyboard.SetInputField(_roomInputField));
+                _roomInputField.onDeselect.AddListener(_ => _handKeyboard.RemoveInputField());
+            }
+
+            GameObject btnCont = MakeRect("BtnArea", _q1Section.transform);
+            AnchorRect(btnCont, 0.2f, 0.06f, 0.8f, 0.32f);
+            _q1ContinueBtn = BuildButton(btnCont.transform, "Continuar",
+                                          new Color(0.12f, 0.45f, 0.85f, 1f));
+            _q1ContinueBtn.onClick.AddListener(OnQ1Continue);
+
+            Navigation inputNav = new Navigation { mode = Navigation.Mode.Explicit };
+            inputNav.selectOnDown = _q1ContinueBtn;
+            _roomInputField.navigation = inputNav;
+
+            Navigation contNav = new Navigation { mode = Navigation.Mode.Explicit };
+            contNav.selectOnUp = _roomInputField;
+            _q1ContinueBtn.navigation = contNav;
+
+            // ── Q2: objeto (lista scrolleable) ───────────────
+            _objectSection = MakeRect("ObjectSection", panel.transform);
+            AnchorRect(_objectSection, 0.05f, 0.08f, 0.95f, 0.75f);
+
+            GameObject qObjArea = MakeRect("QArea", _objectSection.transform);
+            AnchorRect(qObjArea, 0f, 0.83f, 1f, 1f);
+            var qObjTxt = MakeText("QText", qObjArea.transform,
+                     "¿Puedes identificar el objeto de la sala?", 52f,
+                     FontStyles.Normal, TextAlignmentOptions.Center,
+                     new Color(0.75f, 0.85f, 1f), stretch: true);
+            qObjTxt.overflowMode = TextOverflowModes.Overflow;
+
+            GameObject scrollGO = MakeRect("ScrollView", _objectSection.transform);
+            AnchorRect(scrollGO, 0f, 0f, 1f, 0.81f);
+
+            ScrollRect scroll = scrollGO.AddComponent<ScrollRect>();
+            scroll.horizontal        = false;
+            scroll.vertical          = true;
+            scroll.scrollSensitivity = 30f;
+
+            GameObject viewport = MakeRect("Viewport", scrollGO.transform);
+            StretchFill(viewport);
+            Image viewportImg = viewport.AddComponent<Image>();
+            viewportImg.color = Color.white;
+            viewport.AddComponent<Mask>().showMaskGraphic = false;
+            scroll.viewport = viewport.GetComponent<RectTransform>();
+
+            GameObject content = MakeRect("Content", viewport.transform);
+            _objectContentRT = content.GetComponent<RectTransform>();
+            _objectContentRT.anchorMin = new Vector2(0f, 1f);
+            _objectContentRT.anchorMax = new Vector2(1f, 1f);
+            _objectContentRT.pivot     = new Vector2(0.5f, 1f);
+            _objectContentRT.offsetMin = Vector2.zero;
+            _objectContentRT.offsetMax = Vector2.zero;
+
+            content.AddComponent<Image>().color = Color.clear;
+
+            VerticalLayoutGroup vlg = content.AddComponent<VerticalLayoutGroup>();
+            vlg.spacing                = 15f;
+            vlg.padding                = new RectOffset(8, 8, 8, 8);
+            vlg.childAlignment         = TextAnchor.UpperCenter;
+            vlg.childForceExpandWidth  = true;
+            vlg.childForceExpandHeight = false;
+            vlg.childControlWidth      = true;
+            vlg.childControlHeight     = true;
+
+            ContentSizeFitter csf = content.AddComponent<ContentSizeFitter>();
+            csf.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+            scroll.content     = _objectContentRT;
+            _objectListContent = content.transform;
+
+            // ── Confirmación ──────────────────────────────────
+            _confirmSection = MakeRect("ConfirmSection", panel.transform);
+            AnchorRect(_confirmSection, 0.05f, 0.08f, 0.95f, 0.75f);
+
+            GameObject confirmTextArea = MakeRect("ConfirmArea", _confirmSection.transform);
+            AnchorRect(confirmTextArea, 0f, 0.45f, 1f, 1f);
+            _confirmText = MakeText("CText", confirmTextArea.transform, "", 52f, FontStyles.Normal,
+                                     TextAlignmentOptions.Center, new Color(0.75f, 0.85f, 1f),
+                                     stretch: true);
+            _confirmText.overflowMode = TextOverflowModes.Overflow;
+
+            GameObject yesArea = MakeRect("YesArea", _confirmSection.transform);
+            AnchorRect(yesArea, 0.08f, 0.05f, 0.44f, 0.38f);
+            _yesBtn = BuildButton(yesArea.transform, "Sí", new Color(0.1f, 0.55f, 0.18f, 1f));
+            _yesBtn.onClick.AddListener(OnYes);
+
+            GameObject noArea = MakeRect("NoArea", _confirmSection.transform);
+            AnchorRect(noArea, 0.56f, 0.05f, 0.92f, 0.38f);
+            _noBtn = BuildButton(noArea.transform, "No", new Color(0.7f, 0.12f, 0.1f, 1f));
+            _noBtn.onClick.AddListener(OnNo);
+
+            Navigation yesNav = new Navigation { mode = Navigation.Mode.Explicit };
+            yesNav.selectOnRight = _noBtn;
+            _yesBtn.navigation = yesNav;
+
+            Navigation noNav = new Navigation { mode = Navigation.Mode.Explicit };
+            noNav.selectOnLeft = _yesBtn;
+            _noBtn.navigation = noNav;
+
+            // ── Completado ────────────────────────────────────
+            _completedSection = MakeRect("CompletedSection", panel.transform);
+            AnchorRect(_completedSection, 0.05f, 0.08f, 0.95f, 0.75f);
+
+            GameObject doneArea = MakeRect("DoneArea", _completedSection.transform);
+            AnchorRect(doneArea, 0f, 0.45f, 1f, 1f);
+            var doneTxt = MakeText("DoneText", doneArea.transform,
+                     "¡Actividad completada!\n¿Deseas repetirla?", 55f,
+                     FontStyles.Bold, TextAlignmentOptions.Center, Color.white, stretch: true);
+            doneTxt.overflowMode = TextOverflowModes.Overflow;
+
+            GameObject repArea = MakeRect("RepeatArea", _completedSection.transform);
+            AnchorRect(repArea, 0.05f, 0.05f, 0.45f, 0.4f);
+            _repeatBtn = BuildButton(repArea.transform, "Repetir", new Color(0.1f, 0.55f, 0.18f, 1f));
+            _repeatBtn.onClick.AddListener(OnRepeat);
+
+            GameObject finArea = MakeRect("FinalizeArea", _completedSection.transform);
+            AnchorRect(finArea, 0.55f, 0.05f, 0.95f, 0.4f);
+            _finalizeBtn = BuildButton(finArea.transform, "Finalizar", new Color(0.45f, 0.12f, 0.6f, 1f));
+            _finalizeBtn.onClick.AddListener(OnFinalize);
+
+            _repeatBtn.navigation = new Navigation
+            {
+                mode = Navigation.Mode.Explicit,
+                selectOnRight = _finalizeBtn
+            };
+
+            _finalizeBtn.navigation = new Navigation
+            {
+                mode = Navigation.Mode.Explicit,
+                selectOnLeft = _repeatBtn
+            };
+
+            // Todas las secciones ocultas al inicio
+            _q1Section.SetActive(false);
+            _objectSection.SetActive(false);
+            _confirmSection.SetActive(false);
+            _completedSection.SetActive(false);
+        }
+
+        // ─────────────────────────────────────────────
+        //  Helpers UI
+        // ─────────────────────────────────────────────
+        private TMP_InputField BuildInputField(Transform parent, string placeholderText)
+        {
+            GameObject go = MakeRect("InputField", parent);
+            StretchFill(go);
+            go.AddComponent<Image>().color = new Color(0.12f, 0.12f, 0.18f, 1f);
+
+            TMP_InputField field = go.AddComponent<TMP_InputField>();
+
+            GameObject textArea = MakeRect("Text Area", go.transform);
+            StretchFill(textArea);
+            RectTransform taRT = textArea.GetComponent<RectTransform>();
+            taRT.offsetMin = new Vector2(12f, 6f);
+            taRT.offsetMax = new Vector2(-12f, -6f);
+
+            GameObject phGO = MakeRect("Placeholder", textArea.transform);
+            StretchFill(phGO);
+            TextMeshProUGUI ph = phGO.AddComponent<TextMeshProUGUI>();
+            ph.text = placeholderText; ph.fontSize = 46f;
+            ph.fontStyle = FontStyles.Italic;
+            ph.color = new Color(0.5f, 0.5f, 0.5f, 0.8f);
+            ph.alignment = TextAlignmentOptions.MidlineLeft;
+
+            GameObject txtGO = MakeRect("Text", textArea.transform);
+            StretchFill(txtGO);
+            TextMeshProUGUI txt = txtGO.AddComponent<TextMeshProUGUI>();
+            txt.fontSize = 46f; txt.color = Color.white;
+            txt.alignment = TextAlignmentOptions.MidlineLeft;
+
+            field.textViewport   = textArea.GetComponent<RectTransform>();
+            field.textComponent  = txt;
+            field.placeholder    = ph;
+            field.lineType       = TMP_InputField.LineType.SingleLine;
+            field.characterLimit = 10;
+
+            return field;
+        }
+
+        private Button BuildButton(Transform parent, string label, Color bgColor)
+        {
+            GameObject go = MakeRect("Btn_" + label, parent);
+            StretchFill(go);
+            go.AddComponent<Image>().color = bgColor;
+
+            Button btn = go.AddComponent<Button>();
+            ColorBlock cb = btn.colors;
+            cb.normalColor      = bgColor;
+            cb.highlightedColor = Color.Lerp(bgColor, Color.white, 0.28f);
+            cb.pressedColor     = Color.Lerp(bgColor, Color.black, 0.28f);
+            cb.selectedColor    = Color.Lerp(bgColor, Color.white, 0.28f);
+            btn.colors = cb;
+
+            MakeText("BtnLabel", go.transform, label, 52f,
+                      FontStyles.Bold, TextAlignmentOptions.Center, Color.white, stretch: true);
+            return btn;
+        }
+
+        private static GameObject MakeRect(string name, Transform parent)
+        {
+            var go = new GameObject(name, typeof(RectTransform));
+            go.transform.SetParent(parent, false);
+            return go;
+        }
+
+        private static GameObject MakeImage(string name, Transform parent, Color color, bool stretch)
+        {
+            GameObject go = MakeRect(name, parent);
+            go.AddComponent<Image>().color = color;
+            if (stretch) StretchFill(go);
+            return go;
+        }
+
+        private static TextMeshProUGUI MakeText(string name, Transform parent, string text,
+                                                 float size, FontStyles style,
+                                                 TextAlignmentOptions align, Color color, bool stretch)
+        {
+            GameObject go = MakeRect(name, parent);
+            if (stretch) StretchFill(go);
+            TextMeshProUGUI tmp = go.AddComponent<TextMeshProUGUI>();
+            tmp.text = text; tmp.fontSize = size; tmp.fontStyle = style;
+            tmp.alignment = align; tmp.color = color;
+            return tmp;
+        }
+
+        private static void StretchFill(GameObject go)
+        {
+            RectTransform rt = go.GetComponent<RectTransform>();
+            rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one;
+            rt.offsetMin = Vector2.zero; rt.offsetMax = Vector2.zero;
+        }
+
+        private static void AnchorRect(GameObject go, float xMin, float yMin, float xMax, float yMax)
+        {
+            RectTransform rt = go.GetComponent<RectTransform>();
+            rt.anchorMin = new Vector2(xMin, yMin); rt.anchorMax = new Vector2(xMax, yMax);
+            rt.offsetMin = Vector2.zero; rt.offsetMax = Vector2.zero;
+        }
+    }
+}

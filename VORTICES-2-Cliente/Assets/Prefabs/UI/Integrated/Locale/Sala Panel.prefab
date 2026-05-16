@@ -2026,7 +2026,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: '{ Select activity }'
+  m_text: '{ tutorialActivityTitle }'
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 862c40f5c16f9ab4a9058cb9e94f2ed3, type: 2}
   m_sharedMaterial: {fileID: 5287465342396467734, guid: 862c40f5c16f9ab4a9058cb9e94f2ed3, type: 2}
@@ -7076,7 +7076,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   textBox: {fileID: 2768601214822716581}
   groupKey: baseStrings
-  stringKey: postloadTitle
+  stringKey: tutorialActivityTitle
 --- !u!114 &1213463490515383678
 MonoBehaviour:
   m_ObjectHideFlags: 0

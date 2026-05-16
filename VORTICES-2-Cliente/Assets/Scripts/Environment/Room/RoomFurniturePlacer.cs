@@ -60,6 +60,18 @@ namespace Vortices
             [Tooltip("¿Colocar en salas del lado derecho?")]
             public bool placeOnRightRooms = true;
     
+            [Tooltip("Nombre visual del mueble en la etiqueta flotante. Si está vacío, se usa el id. " +
+                     "Muebles con el mismo nombre reciben número automático: 'Television 1', 'Television 2'…")]
+            public string displayName = string.Empty;
+
+            [Tooltip("Si está activo, el cartel aparece al frente del objeto en lugar de encima " +
+                     "(útil cuando otro mueble está apilado encima).")]
+            public bool labelInFront = false;
+
+            [Tooltip("Offset extra en Y para la etiqueta flotante (en metros). " +
+                     "Útil cuando hay otro mueble apilado encima y el cartel queda tapado.")]
+            public float labelHeightOffset = 0f;
+
             [Tooltip("Configuración de SoundEmitter por sala. Dejar sin overrides para que el mueble no emita sonido.")]
             public FurnitureAudioInjector.FurnitureAudioConfig audio = new FurnitureAudioInjector.FurnitureAudioConfig();
         }
@@ -68,12 +80,17 @@ namespace Vortices
         //  Inspector
         // ─────────────────────────────────────────────
     
-        [Header("Muebles")]
-        [SerializeField] private List<FurniturePlacement> furniturePlacements = new List<FurniturePlacement>();
-    
+        [Header("Configuración")]
+        [Tooltip("Asset SO con la lista de muebles. El mismo que usa SalaPanel en el menú principal.")]
+        [SerializeField] private FurniturePlacerConfigSO config;
+
         [Header("Dependencias")]
         [Tooltip("Referencia al inyector de audio. Puede estar en el mismo GameObject o en otro.")]
         [SerializeField] private FurnitureAudioInjector audioInjector;
+
+        private List<FurniturePlacement> furniturePlacements =>
+            config != null ? config.furniturePlacements : null;
+
     
         // ─────────────────────────────────────────────
         //  API pública — cálculo de objetos
@@ -205,7 +222,19 @@ namespace Vortices
             instance.transform.localScale    = ResolveScale(placement);
     
             placedById[id] = instance;
-    
+
+            // Nombre visual: usa displayName del inspector tal cual, o el id si está vacío
+            string displayLabel = !string.IsNullOrWhiteSpace(placement.displayName)
+                ? placement.displayName.Trim()
+                : id;
+
+            // Etiqueta flotante: hijo de furnitureRoot (sin herencia de escala/rotación del objeto)
+            GameObject labelGO = new GameObject("FurnitureLabel_" + id);
+            labelGO.transform.SetParent(furnitureRoot);
+            FurnitureLabel label = labelGO.AddComponent<FurnitureLabel>();
+            label.roomIndex = roomIndex;
+            label.Setup(displayLabel, instance.transform, placement.labelInFront, placement.labelHeightOffset);
+
             // Delegar audio estático al inyector (solo si el tipo de objeto fue seleccionado)
             bool isExplicitlySelected = SessionManager.instance != null
                 && SessionManager.instance.selectedObjectTypes != null
@@ -229,8 +258,10 @@ namespace Vortices
             if (isExplicitlySelected)
             {
                 AudioTargetMarker marker = instance.AddComponent<AudioTargetMarker>();
-                marker.roomIndex  = roomIndex;
-                marker.prefabType = placement.prefab.name;
+                marker.roomIndex        = roomIndex;
+                marker.prefabType       = placement.prefab.name;
+                marker.labelDisplayName = displayLabel;
+                marker.furnitureLabel   = label;
             }
     
             return instance;

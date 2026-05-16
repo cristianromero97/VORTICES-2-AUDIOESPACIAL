@@ -298,6 +298,23 @@ namespace Vortices
  
             if (furniturePlacer != null)
                 furniturePlacer.PlaceInRoom(roomRoot.transform, index, side, xCenter, zCenter);
+
+            SpawnRoomSign(roomRoot.transform, index, side, xCenter, zCenter);
+        }
+
+        private void SpawnRoomSign(Transform parent, int index, int side, float xCenter, float zCenter)
+        {
+            float doorwayWallX = xCenter - side * (roomWidth * 0.5f - wallThickness * 0.5f);
+            // Desplazar hacia el corredor para que sea visible (0.3 m desde el muro)
+            float signX = doorwayWallX - side * 0.3f;
+            // Y: centrado entre la parte superior del vano y el techo
+            float signY = (doorwayHeight + corridorHeight) * 0.5f;
+
+            GameObject signGO = new GameObject("RoomSign_" + index);
+            signGO.transform.SetParent(parent, false);
+            signGO.transform.position = new Vector3(signX, signY, zCenter);
+
+            signGO.AddComponent<RoomSign>().Setup(index, side);
         }
  
         private void BuildDoorwayWall(

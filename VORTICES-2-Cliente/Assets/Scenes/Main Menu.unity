@@ -30070,6 +30070,7 @@ MonoBehaviour:
   emitterMinConfigLevel: 2
   emitterMinDistance: 1
   emitterMaxDistance: 20
+  proximityLabelRadius: 1.5
   displayMode: 
   browsingMode: 
   volumetric: 0

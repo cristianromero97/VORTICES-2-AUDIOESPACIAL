@@ -43,6 +43,8 @@ namespace Vortices
         public int   emitterMinConfigLevel = 2;
         public float emitterMinDistance    = 1f;
         public float emitterMaxDistance    = 12f;
+        // Radio (metros) para marcar labels de objetos cercanos como conflicto (rojo)
+        public float proximityLabelRadius  = 1.5f;
         // Environment Settings
         public string displayMode;
         public string browsingMode;
@@ -784,6 +786,7 @@ namespace Vortices
 
                 marker.audioFileName   = System.IO.Path.GetFileNameWithoutExtension(path);
                 marker.userAudioSource = src;
+                marker.furnitureLabel?.MarkAsAudioSource(true);
 
                 assignedSounds.Add((marker, src));
                 Debug.Log($"[SessionManager] AssignUserAudio: Room {marker.roomIndex} ({marker.prefabType}) ← {System.IO.Path.GetFileName(path)}");
@@ -791,6 +794,11 @@ namespace Vortices
 
             if (markers.Count > assignCount)
                 Debug.Log($"[SessionManager] AssignUserAudio: {markers.Count - assignCount} objeto(s) sin audio (menos archivos que objetos).");
+
+            // Colorear labels: rojo para objetos cercanos a una fuente sonora asignada
+            // List<AudioTargetMarker> assignedMarkers = new List<AudioTargetMarker>();
+            // foreach ((AudioTargetMarker m, AudioSource _) in assignedSounds) assignedMarkers.Add(m);
+            // FurnitureLabel.ApplyProximityColors(assignedMarkers, proximityLabelRadius);
 
             // Inicializar SonidosPanel con los sonidos asignados exitosamente
             SonidosPanel sonidosPanel = GameObject.FindObjectOfType<SonidosPanel>(true);
