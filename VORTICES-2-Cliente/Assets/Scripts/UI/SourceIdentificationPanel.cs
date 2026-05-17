@@ -12,11 +12,11 @@ namespace Vortices
     /// SourceIdentificationPanel: Se adjunta a un GO DENTRO del Canvas de un VRPanel.
     /// No crea Canvas propio — usa el Canvas padre del VRPanel.
     ///
-    /// Flujo: Q1 (sala, texto) → Confirmar sala → Q2 (objeto, lista) → Confirmar objeto → Completado
+    /// Flujo: Q1 (sala, lista) → Confirmar sala → Q2 (objeto, lista) → Confirmar objeto → Completado
     ///
     /// Navegación por teclado:
-    ///   Q1       → Enter en el campo envía la respuesta.
-    ///   Confirmar→ Flechas Izq/Der entre Sí y No, Enter para confirmar.
+    ///   Q1 lista → Flechas Arr/Abajo entre salas, Enter para seleccionar.
+    ///   Confirmar → Flechas Izq/Der entre Sí y No, Enter para confirmar.
     ///   Q2 lista → Flechas Arr/Abajo entre botones, Enter para seleccionar.
     ///   Completado → Flechas Izq/Der entre Repetir y Finalizar, Enter.
     /// </summary>
@@ -53,13 +53,19 @@ namespace Vortices
         // Referencia al teclado virtual de la mano
         private HandKeyboard _handKeyboard;
 
-        private GameObject     _q1Section;
-        private TMP_InputField _roomInputField;
-        private Button         _q1ContinueBtn;
+        // Q1 — lista de salas (modo actual)
+        private GameObject    _q1Section;
+        private RectTransform _roomContentRT;
+        private Transform     _roomListContent;
 
-        private GameObject _objectSection;
-        private Transform  _objectListContent;
-        private RectTransform _objectContentRT;
+        // Q1 — campo de texto (comentado — descomentar para volver al teclado virtual)
+        // private TMP_InputField _roomInputField;
+        // private Button         _q1ContinueBtn;
+
+        // Q2 — lista de objetos
+        private GameObject     _objectSection;
+        private Transform      _objectListContent;
+        private RectTransform  _objectContentRT;
 
         private GameObject      _confirmSection;
         private TextMeshProUGUI _confirmText;
@@ -78,7 +84,6 @@ namespace Vortices
             BuildUI();
             SetVisible(false);
 
-            // Buscar el HandKeyboard en la escena
             _handKeyboard = FindObjectOfType<HandKeyboard>();
             if (_handKeyboard == null)
                 Debug.LogWarning("[SourceID] HandKeyboard no encontrado en la escena");
@@ -143,9 +148,11 @@ namespace Vortices
             switch (s)
             {
                 case PanelState.Q1Room:
-                    _roomInputField.text = string.Empty;
-                    _roomInputField.ActivateInputField();
-                    Select(_roomInputField.gameObject);
+                    // -- Versión teclado virtual (descomentar para restaurar) --
+                    // _roomInputField.text = string.Empty;
+                    // _roomInputField.ActivateInputField();
+                    // Select(_roomInputField.gameObject);
+                    StartCoroutine(BuildRoomButtonsNextFrame());
                     break;
 
                 case PanelState.ConfirmRoom:
@@ -169,21 +176,101 @@ namespace Vortices
         }
 
         // ─────────────────────────────────────────────
-        //  Lista de objetos — espera un frame para que
-        //  el layout del ScrollRect esté activo antes
-        //  de calcular el tamaño del Content
+        //  Q1 — lista de números de sala
         // ─────────────────────────────────────────────
-        private IEnumerator BuildObjectButtonsNextFrame()
+        private IEnumerator BuildRoomButtonsNextFrame()
         {
-            // Limpiar botones anteriores
-            for (int i = _objectListContent.childCount - 1; i >= 0; i--)
-                DestroyImmediate(_objectListContent.GetChild(i).gameObject);
+            for (int i = _roomListContent.childCount - 1; i >= 0; i--)
+                DestroyImmediate(_roomListContent.GetChild(i).gameObject);
 
-            yield return null; // esperar a que se destruyan
+            yield return null;
+
+            // Recopilar índices únicos de sala desde los FurnitureLabel activos
+            var roomSet = new SortedSet<int>();
+            foreach (FurnitureLabel lbl in FurnitureLabel.All)
+            {
+                if (lbl != null) roomSet.Add(lbl.roomIndex);
+            }
 
             var buttons = new List<Button>();
 
-            // Mostrar TODOS los muebles de la sala, no solo los que tienen audio
+            foreach (int ri in roomSet)
+            {
+                int capturedRoom = ri;
+
+                GameObject rowGO = MakeRect("Row_Sala" + ri, _roomListContent);
+                rowGO.AddComponent<LayoutElement>().preferredHeight = 120f;
+                rowGO.AddComponent<Image>().color = new Color(0.12f, 0.2f, 0.45f, 0.95f);
+
+                Button btn = rowGO.AddComponent<Button>();
+                ColorBlock cb = btn.colors;
+                cb.normalColor      = new Color(0.12f, 0.2f,  0.45f, 0.95f);
+                cb.highlightedColor = new Color(0.25f, 0.45f, 0.8f,  1f);
+                cb.pressedColor     = new Color(0.08f, 0.15f, 0.35f, 1f);
+                cb.selectedColor    = new Color(0.25f, 0.45f, 0.8f,  1f);
+                btn.colors = cb;
+
+                MakeText("Label", rowGO.transform, "Sala " + ri, 56f,
+                          FontStyles.Bold, TextAlignmentOptions.Center,
+                          Color.white, stretch: true);
+
+                btn.onClick.AddListener(() => OnRoomSelected(capturedRoom));
+                buttons.Add(btn);
+            }
+
+            const float buttonHeight = 120f;
+            const float spacing      = 15f;
+            const float padding      = 16f;
+            float totalHeight = (buttons.Count * buttonHeight)
+                              + (Mathf.Max(0, buttons.Count - 1) * spacing)
+                              + padding;
+
+            _roomContentRT.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, totalHeight);
+            Canvas.ForceUpdateCanvases();
+            LayoutRebuilder.ForceRebuildLayoutImmediate(_roomContentRT);
+
+            // Navegación vertical entre botones
+            for (int i = 0; i < buttons.Count; i++)
+            {
+                Navigation nav = new Navigation { mode = Navigation.Mode.Explicit };
+                if (i > 0)                  nav.selectOnUp   = buttons[i - 1];
+                if (i < buttons.Count - 1)  nav.selectOnDown = buttons[i + 1];
+                buttons[i].navigation = nav;
+            }
+
+            if (buttons.Count > 0)
+                Select(buttons[0].gameObject);
+
+            Debug.Log($"[SourceID] Salas disponibles: {buttons.Count}");
+        }
+
+        private void OnRoomSelected(int room)
+        {
+            _roomAnswer = room.ToString();
+            EnterState(PanelState.ConfirmRoom);
+        }
+
+        // -- Versión teclado virtual (descomentar para restaurar) --
+        // private void OnQ1Continue()
+        // {
+        //     string answer = _roomInputField.text.Trim();
+        //     if (string.IsNullOrEmpty(answer)) return;
+        //     _roomAnswer = answer;
+        //     EnterState(PanelState.ConfirmRoom);
+        // }
+
+        // ─────────────────────────────────────────────
+        //  Q2 — lista de objetos
+        // ─────────────────────────────────────────────
+        private IEnumerator BuildObjectButtonsNextFrame()
+        {
+            for (int i = _objectListContent.childCount - 1; i >= 0; i--)
+                DestroyImmediate(_objectListContent.GetChild(i).gameObject);
+
+            yield return null;
+
+            var buttons = new List<Button>();
+
             foreach (FurnitureLabel lbl in FurnitureLabel.All)
             {
                 if (lbl == null || lbl.roomIndex != _currentMarker.roomIndex) continue;
@@ -210,18 +297,14 @@ namespace Vortices
                 buttons.Add(btn);
             }
 
-            // Calcular altura total manualmente basada en botones + layout
             const float buttonHeight = 120f;
-            const float spacing = 18f;
-            const float padding = 16f;
+            const float spacing      = 15f;
+            const float padding      = 16f;
             float totalHeight = (buttons.Count * buttonHeight)
                               + (Mathf.Max(0, buttons.Count - 1) * spacing)
                               + padding;
 
-            // Establecer altura del Content directamente
             _objectContentRT.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, totalHeight);
-
-            // Forzar rebuilds en cascada para propagar el layout
             Canvas.ForceUpdateCanvases();
             LayoutRebuilder.ForceRebuildLayoutImmediate(_objectContentRT);
             if (_objectContentRT.parent != null)
@@ -229,7 +312,6 @@ namespace Vortices
 
             Debug.Log($"[SourceID] Objetos mostrados: {buttons.Count} | room: {_currentMarker.roomIndex}");
 
-            // Navegación vertical explícita entre botones
             for (int i = 0; i < buttons.Count; i++)
             {
                 Navigation nav = new Navigation { mode = Navigation.Mode.Explicit };
@@ -238,10 +320,6 @@ namespace Vortices
                 buttons[i].navigation = nav;
             }
 
-            // Asegurar que el scroll quede al tope para que los botones sean visibles
-            ScrollRect sr = _objectListContent.GetComponentInParent<ScrollRect>();
-            if (sr != null) sr.verticalNormalizedPosition = 1f;
-
             if (buttons.Count > 0)
                 Select(buttons[0].gameObject);
         }
@@ -249,14 +327,6 @@ namespace Vortices
         // ─────────────────────────────────────────────
         //  Callbacks
         // ─────────────────────────────────────────────
-        private void OnQ1Continue()
-        {
-            string answer = _roomInputField.text.Trim();
-            if (string.IsNullOrEmpty(answer)) return;
-            _roomAnswer = answer;
-            EnterState(PanelState.ConfirmRoom);
-        }
-
         private void OnObjectSelected(string objectLabel)
         {
             _objectAnswer = objectLabel;
@@ -279,16 +349,11 @@ namespace Vortices
                 EnterState(PanelState.Q2Object);
         }
 
-        private void Finish()
-        {
-            // Solo pasar a estado Completado, el CSV se guarda en OnFinalize
-            EnterState(PanelState.Completed);
-        }
+        private void Finish() => EnterState(PanelState.Completed);
 
         private void OnRepeat()
         {
             _answered.Clear();
-            // Reiniciar fuentes de audio para que el jugador pueda volver a escuchar
             foreach (AudioTargetMarker m in AudioTargetMarker.All)
             {
                 if (m.userAudioSource != null && !m.userAudioSource.isPlaying)
@@ -301,11 +366,8 @@ namespace Vortices
 
         private void OnFinalize()
         {
-            // Guardar la respuesta en CSV cuando se elige finalizar
             _answered.Add(_currentMarker);
             LogResponse();
-
-            // _answered conserva su contenido: no se vuelven a disparar triggers de este marker
             SetVisible(false);
             _state = PanelState.Idle;
             Debug.Log("[SourceID] Actividad finalizada — respuesta guardada en CSV");
@@ -409,43 +471,76 @@ namespace Vortices
                                       TextAlignmentOptions.Center,
                                       new Color(0.85f, 0.85f, 0.85f), stretch: true);
 
-            // ── Q1: sala ─────────────────────────────────────
+            // ── Q1: sala — lista scrolleable ──────────────────
             _q1Section = MakeRect("Q1Section", panel.transform);
             AnchorRect(_q1Section, 0.05f, 0.08f, 0.95f, 0.75f);
 
             GameObject qRoomArea = MakeRect("QArea", _q1Section.transform);
-            AnchorRect(qRoomArea, 0f, 0.68f, 1f, 1f);
+            AnchorRect(qRoomArea, 0f, 0.88f, 1f, 1f);
             var qRoomTxt = MakeText("QText", qRoomArea.transform,
                      "¿En qué sala identificaste el sonido?", 52f,
                      FontStyles.Normal, TextAlignmentOptions.Center,
                      new Color(0.75f, 0.85f, 1f), stretch: true);
             qRoomTxt.overflowMode = TextOverflowModes.Overflow;
 
-            GameObject fieldArea = MakeRect("FieldArea", _q1Section.transform);
-            AnchorRect(fieldArea, 0.15f, 0.38f, 0.85f, 0.65f);
-            _roomInputField = BuildInputField(fieldArea.transform, "Número de sala...");
-            _roomInputField.onSubmit.AddListener(_ => OnQ1Continue());
+            // -- Versión teclado virtual (descomentar para restaurar) --
+            // GameObject fieldArea = MakeRect("FieldArea", _q1Section.transform);
+            // AnchorRect(fieldArea, 0.15f, 0.38f, 0.85f, 0.65f);
+            // _roomInputField = BuildInputField(fieldArea.transform, "Número de sala...");
+            // _roomInputField.onSubmit.AddListener(_ => OnQ1Continue());
+            // if (_handKeyboard != null)
+            // {
+            //     _roomInputField.onSelect.AddListener(_ => _handKeyboard.SetInputField(_roomInputField));
+            //     _roomInputField.onDeselect.AddListener(_ => _handKeyboard.RemoveInputField());
+            // }
+            // GameObject btnCont = MakeRect("BtnArea", _q1Section.transform);
+            // AnchorRect(btnCont, 0.2f, 0.06f, 0.8f, 0.32f);
+            // _q1ContinueBtn = BuildButton(btnCont.transform, "Continuar", new Color(0.12f, 0.45f, 0.85f, 1f));
+            // _q1ContinueBtn.onClick.AddListener(OnQ1Continue);
+            // Navigation inputNav = new Navigation { mode = Navigation.Mode.Explicit };
+            // inputNav.selectOnDown = _q1ContinueBtn;
+            // _roomInputField.navigation = inputNav;
+            // Navigation contNav = new Navigation { mode = Navigation.Mode.Explicit };
+            // contNav.selectOnUp = _roomInputField;
+            // _q1ContinueBtn.navigation = contNav;
 
-            // Conectar HandKeyboard: mostrar al seleccionar, ocultar al deseleccionar
-            if (_handKeyboard != null)
-            {
-                _roomInputField.onSelect.AddListener(_ => _handKeyboard.SetInputField(_roomInputField));
-                _roomInputField.onDeselect.AddListener(_ => _handKeyboard.RemoveInputField());
-            }
+            // Lista scrolleable de salas
+            GameObject roomScrollGO = MakeRect("RoomScrollView", _q1Section.transform);
+            AnchorRect(roomScrollGO, 0f, 0f, 1f, 0.86f);
 
-            GameObject btnCont = MakeRect("BtnArea", _q1Section.transform);
-            AnchorRect(btnCont, 0.2f, 0.06f, 0.8f, 0.32f);
-            _q1ContinueBtn = BuildButton(btnCont.transform, "Continuar",
-                                          new Color(0.12f, 0.45f, 0.85f, 1f));
-            _q1ContinueBtn.onClick.AddListener(OnQ1Continue);
+            ScrollRect roomScroll = roomScrollGO.AddComponent<ScrollRect>();
+            roomScroll.horizontal        = false;
+            roomScroll.vertical          = true;
+            roomScroll.scrollSensitivity = 30f;
 
-            Navigation inputNav = new Navigation { mode = Navigation.Mode.Explicit };
-            inputNav.selectOnDown = _q1ContinueBtn;
-            _roomInputField.navigation = inputNav;
+            GameObject roomViewport = MakeRect("Viewport", roomScrollGO.transform);
+            StretchFill(roomViewport);
+            Image roomViewportImg = roomViewport.AddComponent<Image>();
+            roomViewportImg.color = Color.white;
+            roomViewport.AddComponent<Mask>().showMaskGraphic = false;
+            roomScroll.viewport = roomViewport.GetComponent<RectTransform>();
 
-            Navigation contNav = new Navigation { mode = Navigation.Mode.Explicit };
-            contNav.selectOnUp = _roomInputField;
-            _q1ContinueBtn.navigation = contNav;
+            GameObject roomContent = MakeRect("Content", roomViewport.transform);
+            _roomContentRT = roomContent.GetComponent<RectTransform>();
+            _roomContentRT.anchorMin = new Vector2(0f, 1f);
+            _roomContentRT.anchorMax = new Vector2(1f, 1f);
+            _roomContentRT.pivot     = new Vector2(0.5f, 1f);
+            _roomContentRT.offsetMin = Vector2.zero;
+            _roomContentRT.offsetMax = Vector2.zero;
+
+            roomContent.AddComponent<Image>().color = Color.clear;
+
+            VerticalLayoutGroup roomVlg = roomContent.AddComponent<VerticalLayoutGroup>();
+            roomVlg.spacing                = 15f;
+            roomVlg.padding                = new RectOffset(8, 8, 8, 8);
+            roomVlg.childAlignment         = TextAnchor.UpperCenter;
+            roomVlg.childForceExpandWidth  = true;
+            roomVlg.childForceExpandHeight = false;
+            roomVlg.childControlWidth      = true;
+            roomVlg.childControlHeight     = true;
+
+            roomScroll.content = _roomContentRT;
+            _roomListContent   = roomContent.transform;
 
             // ── Q2: objeto (lista scrolleable) ───────────────
             _objectSection = MakeRect("ObjectSection", panel.transform);
@@ -493,9 +588,6 @@ namespace Vortices
             vlg.childControlWidth      = true;
             vlg.childControlHeight     = true;
 
-            ContentSizeFitter csf = content.AddComponent<ContentSizeFitter>();
-            csf.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-
             scroll.content     = _objectContentRT;
             _objectListContent = content.transform;
 
@@ -520,13 +612,10 @@ namespace Vortices
             _noBtn = BuildButton(noArea.transform, "No", new Color(0.7f, 0.12f, 0.1f, 1f));
             _noBtn.onClick.AddListener(OnNo);
 
-            Navigation yesNav = new Navigation { mode = Navigation.Mode.Explicit };
-            yesNav.selectOnRight = _noBtn;
-            _yesBtn.navigation = yesNav;
-
-            Navigation noNav = new Navigation { mode = Navigation.Mode.Explicit };
-            noNav.selectOnLeft = _yesBtn;
-            _noBtn.navigation = noNav;
+            _yesBtn.navigation = new Navigation
+                { mode = Navigation.Mode.Explicit, selectOnRight = _noBtn };
+            _noBtn.navigation  = new Navigation
+                { mode = Navigation.Mode.Explicit, selectOnLeft  = _yesBtn };
 
             // ── Completado ────────────────────────────────────
             _completedSection = MakeRect("CompletedSection", panel.transform);
@@ -549,17 +638,10 @@ namespace Vortices
             _finalizeBtn = BuildButton(finArea.transform, "Finalizar", new Color(0.45f, 0.12f, 0.6f, 1f));
             _finalizeBtn.onClick.AddListener(OnFinalize);
 
-            _repeatBtn.navigation = new Navigation
-            {
-                mode = Navigation.Mode.Explicit,
-                selectOnRight = _finalizeBtn
-            };
-
+            _repeatBtn.navigation  = new Navigation
+                { mode = Navigation.Mode.Explicit, selectOnRight = _finalizeBtn };
             _finalizeBtn.navigation = new Navigation
-            {
-                mode = Navigation.Mode.Explicit,
-                selectOnLeft = _repeatBtn
-            };
+                { mode = Navigation.Mode.Explicit, selectOnLeft  = _repeatBtn };
 
             // Todas las secciones ocultas al inicio
             _q1Section.SetActive(false);
@@ -571,42 +653,38 @@ namespace Vortices
         // ─────────────────────────────────────────────
         //  Helpers UI
         // ─────────────────────────────────────────────
-        private TMP_InputField BuildInputField(Transform parent, string placeholderText)
-        {
-            GameObject go = MakeRect("InputField", parent);
-            StretchFill(go);
-            go.AddComponent<Image>().color = new Color(0.12f, 0.12f, 0.18f, 1f);
 
-            TMP_InputField field = go.AddComponent<TMP_InputField>();
-
-            GameObject textArea = MakeRect("Text Area", go.transform);
-            StretchFill(textArea);
-            RectTransform taRT = textArea.GetComponent<RectTransform>();
-            taRT.offsetMin = new Vector2(12f, 6f);
-            taRT.offsetMax = new Vector2(-12f, -6f);
-
-            GameObject phGO = MakeRect("Placeholder", textArea.transform);
-            StretchFill(phGO);
-            TextMeshProUGUI ph = phGO.AddComponent<TextMeshProUGUI>();
-            ph.text = placeholderText; ph.fontSize = 46f;
-            ph.fontStyle = FontStyles.Italic;
-            ph.color = new Color(0.5f, 0.5f, 0.5f, 0.8f);
-            ph.alignment = TextAlignmentOptions.MidlineLeft;
-
-            GameObject txtGO = MakeRect("Text", textArea.transform);
-            StretchFill(txtGO);
-            TextMeshProUGUI txt = txtGO.AddComponent<TextMeshProUGUI>();
-            txt.fontSize = 46f; txt.color = Color.white;
-            txt.alignment = TextAlignmentOptions.MidlineLeft;
-
-            field.textViewport   = textArea.GetComponent<RectTransform>();
-            field.textComponent  = txt;
-            field.placeholder    = ph;
-            field.lineType       = TMP_InputField.LineType.SingleLine;
-            field.characterLimit = 10;
-
-            return field;
-        }
+        // -- Versión teclado virtual (descomentar para restaurar) --
+        // private TMP_InputField BuildInputField(Transform parent, string placeholderText)
+        // {
+        //     GameObject go = MakeRect("InputField", parent);
+        //     StretchFill(go);
+        //     go.AddComponent<Image>().color = new Color(0.12f, 0.12f, 0.18f, 1f);
+        //     TMP_InputField field = go.AddComponent<TMP_InputField>();
+        //     GameObject textArea = MakeRect("Text Area", go.transform);
+        //     StretchFill(textArea);
+        //     RectTransform taRT = textArea.GetComponent<RectTransform>();
+        //     taRT.offsetMin = new Vector2(12f, 6f);
+        //     taRT.offsetMax = new Vector2(-12f, -6f);
+        //     GameObject phGO = MakeRect("Placeholder", textArea.transform);
+        //     StretchFill(phGO);
+        //     TextMeshProUGUI ph = phGO.AddComponent<TextMeshProUGUI>();
+        //     ph.text = placeholderText; ph.fontSize = 46f;
+        //     ph.fontStyle = FontStyles.Italic;
+        //     ph.color = new Color(0.5f, 0.5f, 0.5f, 0.8f);
+        //     ph.alignment = TextAlignmentOptions.MidlineLeft;
+        //     GameObject txtGO = MakeRect("Text", textArea.transform);
+        //     StretchFill(txtGO);
+        //     TextMeshProUGUI txt = txtGO.AddComponent<TextMeshProUGUI>();
+        //     txt.fontSize = 46f; txt.color = Color.white;
+        //     txt.alignment = TextAlignmentOptions.MidlineLeft;
+        //     field.textViewport   = textArea.GetComponent<RectTransform>();
+        //     field.textComponent  = txt;
+        //     field.placeholder    = ph;
+        //     field.lineType       = TMP_InputField.LineType.SingleLine;
+        //     field.characterLimit = 10;
+        //     return field;
+        // }
 
         private Button BuildButton(Transform parent, string label, Color bgColor)
         {

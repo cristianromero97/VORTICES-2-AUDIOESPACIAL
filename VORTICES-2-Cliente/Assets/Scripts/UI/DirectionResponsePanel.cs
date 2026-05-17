@@ -70,6 +70,9 @@ namespace Vortices
         // ─────────────────────────────────────────────
         public void Show(AudioTargetMarker marker, SonidosPanel returnPanel)
         {
+            // Si el panel ya está activo, ignorar — el usuario debe Repetir o Finalizar primero
+            if (_isVisible) return;
+
             _currentMarker     = marker;
             _sonidosPanel      = returnPanel;
             _selectedDirection = null;
@@ -173,9 +176,9 @@ namespace Vortices
 
         private void OnRepeat()
         {
-            if (_currentMarker?.userAudioSource != null && !_currentMarker.userAudioSource.isPlaying)
-                _currentMarker.userAudioSource.Play();
-            EnterState(PanelState.Selecting);
+            // Cierra el panel y espera el próximo trigger (SonidosPanel → proximidad)
+            // NO llama OnDirectionResponded: SonidosPanel queda libre para volver a emitir
+            SetVisible(false);
         }
 
         private void OnFinalize()
