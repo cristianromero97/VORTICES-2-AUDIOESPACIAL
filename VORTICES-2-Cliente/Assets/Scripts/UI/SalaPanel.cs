@@ -104,8 +104,11 @@ namespace Vortices
         [SerializeField] private Slider       spatialBlendSlider;
         [SerializeField] private Slider       spreadSlider;
         [SerializeField] private Slider       dopplerSlider;
-        [SerializeField] private TMP_Dropdown rolloffModeDropdown;
-        [SerializeField] private Toggle       spatializeToggle;
+        [SerializeField] private TMP_Dropdown    rolloffModeDropdown;
+        [SerializeField] private Toggle          spatializeToggle;
+        [SerializeField] private TextMeshProUGUI spatialBlendText;
+        [SerializeField] private TextMeshProUGUI spreadText;
+        [SerializeField] private TextMeshProUGUI dopplerText;
  
         // ─────────────────────────────────────────────
         //  Inspector — Step 5: Audio Config
@@ -422,6 +425,10 @@ namespace Vortices
             }
 
             RefreshImmersionSliders();
+
+            if (spatialBlendSlider != null) spatialBlendSlider.onValueChanged.AddListener(v => UpdateSpatialBlendText(v));
+            if (spreadSlider       != null) spreadSlider.onValueChanged.AddListener(v => UpdateSpreadText(v));
+            if (dopplerSlider      != null) dopplerSlider.onValueChanged.AddListener(v => UpdateDopplerText(v));
         }
 
         private void RefreshImmersionSliders()
@@ -457,6 +464,10 @@ namespace Vortices
             if (dopplerSlider       != null) dopplerSlider.value       = doppler;
             if (spatializeToggle    != null) spatializeToggle.isOn     = spatialize;
             if (rolloffModeDropdown != null) rolloffModeDropdown.value = rolloff;
+
+            UpdateSpatialBlendText(spatialBlend);
+            UpdateSpreadText(spread);
+            UpdateDopplerText(doppler);
 
         }
 
@@ -546,7 +557,22 @@ namespace Vortices
         {
             emitterBaseVolume = value;
             if (baseVolumeText != null)
-                baseVolumeText.text = $"{value:F2}";
+                baseVolumeText.text = $"Config Volume  {value:F2}";
+        }
+
+        public void UpdateSpatialBlendText(float value)
+        {
+            if (spatialBlendText != null) spatialBlendText.text = $"Spatial Blend  {value:F2}";
+        }
+
+        public void UpdateSpreadText(float value)
+        {
+            if (spreadText != null) spreadText.text = $"Spread  {value:F0}";
+        }
+
+        public void UpdateDopplerText(float value)
+        {
+            if (dopplerText != null) dopplerText.text = $"Doppler Level  {value:F2}";
         }
  
         public void OnAudioConfigChanged()
