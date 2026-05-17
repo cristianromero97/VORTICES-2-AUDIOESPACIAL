@@ -143,6 +143,9 @@ namespace Vortices
         //  Unity
         // ─────────────────────────────────────────────
  
+        // Teclado VR
+        private HandKeyboard _handKeyboard;
+
         private void OnEnable()
         {
             sessionManager = GameObject.Find("SessionManager")?.GetComponent<SessionManager>();
@@ -173,6 +176,43 @@ namespace Vortices
             FixDropdownForVR(configLevelDropdown);
             FixDropdownForVR(rolloffModeDropdown);
             OnRoomConfigChanged();
+
+            // Conectar teclado VR a todos los TMP_InputField del panel
+            GameObject keyboardGO = GameObject.Find("Keyboard Canvas");
+            _handKeyboard = keyboardGO?.GetComponent<HandKeyboard>();
+            WireKeyboard(minRoomsInput);
+            WireKeyboard(maxRoomsInput);
+            WireKeyboard(minConfigLevelInput);
+            WireKeyboard(minDistanceInput);
+            WireKeyboard(maxDistanceInput);
+            WireKeyboard(newDirectionInput);
+        }
+
+        private void OnDisable()
+        {
+            _handKeyboard?.RemoveInputField();
+            ClearKeyboard(minRoomsInput);
+            ClearKeyboard(maxRoomsInput);
+            ClearKeyboard(minConfigLevelInput);
+            ClearKeyboard(minDistanceInput);
+            ClearKeyboard(maxDistanceInput);
+            ClearKeyboard(newDirectionInput);
+            _handKeyboard = null;
+        }
+
+        private void WireKeyboard(TMP_InputField field)
+        {
+            if (field == null || _handKeyboard == null) return;
+            HandKeyboard kb = _handKeyboard;
+            field.onSelect.AddListener(_ => kb.SetInputField(field));
+            field.onDeselect.AddListener(_ => kb.RemoveInputField());
+        }
+
+        private void ClearKeyboard(TMP_InputField field)
+        {
+            if (field == null) return;
+            field.onSelect.RemoveAllListeners();
+            field.onDeselect.RemoveAllListeners();
         }
  
         // ─────────────────────────────────────────────
