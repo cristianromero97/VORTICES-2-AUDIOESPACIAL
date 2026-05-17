@@ -169,6 +169,9 @@ namespace Vortices
             SetupStep4Defaults();
             SetupStep5Defaults();
             SetupStep5RoomFilter();
+
+            FixDropdownForVR(configLevelDropdown);
+            FixDropdownForVR(rolloffModeDropdown);
             OnRoomConfigChanged();
         }
  
@@ -551,6 +554,15 @@ namespace Vortices
                 if (roomFilterMode == 2 && !isEven) ids.Add(i);
             }
             return ids;
+        }
+
+        private static void FixDropdownForVR(TMP_Dropdown dropdown)
+        {
+            if (dropdown == null || dropdown.template == null) return;
+            Canvas c = dropdown.template.GetComponent<Canvas>();
+            if (c == null) c = dropdown.template.gameObject.AddComponent<Canvas>();
+            c.overrideSorting = true;
+            c.sortingOrder    = 30;
         }
 
         public void UpdateBaseVolumeText(float value)
