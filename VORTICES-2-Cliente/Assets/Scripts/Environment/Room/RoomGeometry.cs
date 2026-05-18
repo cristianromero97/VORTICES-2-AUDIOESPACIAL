@@ -19,6 +19,10 @@ namespace Vortices
  
         [Header("Generación")]
         [SerializeField] private bool generateOnStart = false;
+        [Tooltip("Si está activo, la generación inicial (generateOnStart) se hace invisible. " +
+                 "Útil para evitar el flash visual antes de que LaunchSession regenere el escenario " +
+                 "con la configuración real del menú.")]
+        [SerializeField] private bool startInvisible = false;
         [SerializeField] private bool clearBeforeGenerate = true;
         [Tooltip("Número de salas a generar. Se clampea a Max Rooms automáticamente.")]
         [SerializeField, Min(1)] private int roomCount = 6;
@@ -69,7 +73,11 @@ namespace Vortices
         private void Start()
         {
             if (generateOnStart)
+            {
                 GenerateScenario();
+                if (startInvisible)
+                    SetScenarioVisible(false);
+            }
         }
  
 #if UNITY_EDITOR
@@ -169,6 +177,18 @@ namespace Vortices
                 MovePlayerToStart();
         }
  
+        /// <summary>
+        /// Activa o desactiva los MeshRenderers del escenario generado sin destruirlo.
+        /// Los colliders se mantienen activos para que el jugador tenga piso.
+        /// </summary>
+        public void SetScenarioVisible(bool visible)
+        {
+            Transform root = transform.Find(GeneratedRootName);
+            if (root == null) return;
+            foreach (Renderer r in root.GetComponentsInChildren<Renderer>(true))
+                r.enabled = visible;
+        }
+
         [ContextMenu("Clear Generated Scenario")]
         public void ClearGeneratedScenario()
         {

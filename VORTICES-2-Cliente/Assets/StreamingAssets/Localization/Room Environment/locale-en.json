@@ -1,0 +1,9 @@
+﻿{
+    "menuTitle": "Room environment",
+
+    "description1": "Welcome to the room environment.\n\nIn this virtual exhibition space, audio objects are located throughout the rooms. Move freely to experience spatial audio from different perspectives and identify the sounds in the exhibition objects.",
+    "description2": "Walk down the corridor and enter each side room to find the audio sources inside. Use the panel to identify a sound object.\n\nMove by aiming at the floor and pressing the grab trigger.\n\nPress Start, explore the rooms, identify the audio sources, and then press Finish to end the session.",
+
+    "startButton": "Start",
+    "finishButton": "Finish"
+}

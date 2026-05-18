@@ -1,0 +1,8 @@
+{
+    "menuTitle": "Entorno Salas",
+
+    "description1": "Bienvenido al entorno de salas.\n\nEn este espacio de exposición virtual, los objetos de audio están ubicados por todas la salas. Muévase libremente para experimentar el audio espacial desde diferentes perspectivas e identificar el sonidos en los objetos de la exposición.",
+    "description2": "Recorre el pasillo y entra en cada habitación lateral para encontrar las fuentes de audio. Usa el panel para identificar un objeto sonoro.\n\nMuévete apuntando al suelo y pulsando el gatillo de agarre.\n\nPulsa Iniciar, explora las habitaciones, identifica las fuentes de audio y, a continuación, pulsa Finalizar para terminar la sesión.",
+    "startButton": "Inicio",
+    "finishButton": "Finalizar"
+}

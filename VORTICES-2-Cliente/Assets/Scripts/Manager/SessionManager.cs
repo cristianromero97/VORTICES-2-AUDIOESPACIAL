@@ -238,7 +238,9 @@ namespace Vortices
             GameObject keyboard = GameObject.Find("Keyboard Canvas");
             if (keyboard != null)
             {
-                keyboard.GetComponent<HandKeyboard>().RemoveInputField();
+                HandKeyboard handKeyboard = keyboard.GetComponent<HandKeyboard>();
+                if (handKeyboard != null)
+                    handKeyboard.RemoveInputField();
             }
  
  
@@ -323,29 +325,15 @@ namespace Vortices
             Debug.Log("Empeze GoTo Offline");
             yield return StartCoroutine(actualTransitionManager.GoToSceneRoutine());
             
-            Debug.Log("Sali GoTo Offline");
-            yield return new WaitForSeconds(initializeTime);
- 
-            // When done, configure controllers of the scene
-            Debug.Log("Busco Offline");
-            actualTransitionManager = GameObject.FindObjectOfType<SceneTransitionManager>(true);
-            categoryController = GameObject.FindObjectOfType<CategoryController>(true);
-            elementCategoryController = GameObject.FindObjectOfType<ElementCategoryController>(true);
-            loggingController = GameObject.FindObjectOfType<LoggingController>(true);
-            spawnController = GameObject.FindObjectOfType<SpawnController>(true);
-            righthandTools = GameObject.FindObjectOfType<RighthandTools>(true);
+            // Un frame para que la escena termine de activarse (Start() de todos los objetos)
+            yield return null;
 
-            if (elementCategoryController != null) elementCategoryController.Initialize();
-            else Debug.LogWarning("[SessionManager] elementCategoryController no encontrado en escena.");
-            if (loggingController != null) loggingController.Initialize();
-            else Debug.LogWarning("[SessionManager] loggingController no encontrado en escena.");
-            if (spawnController != null) spawnController.Initialize();
-            else Debug.LogWarning("[SessionManager] spawnController no encontrado en escena.");
- 
-            // Inicializar componentes de Sala Environment
+            Debug.Log("Sali GoTo Offline");
+
+            // Para Sala: configurar y regenerar AHORA, mientras la pantalla aún está negra
+            // (FadeIn acaba de empezar — el jugador no verá el corredor inicial incorrecto)
             if (environmentName == "Sala")
             {
-                // AudioManager primero: la inyección de audio ocurre durante GenerateScenario
                 AudioManager audioManager = GameObject.FindObjectOfType<AudioManager>(true);
                 if (audioManager != null)
                 {
@@ -364,7 +352,6 @@ namespace Vortices
                 else
                     Debug.LogWarning("[SessionManager] AudioManager no encontrado en Sala Environment.");
 
-                // RoomGeometry después: aplica config y regenera la geometría + muebles
                 RoomGeometry roomGeometry = GameObject.FindObjectOfType<RoomGeometry>(true);
                 if (roomGeometry != null)
                 {
@@ -373,8 +360,30 @@ namespace Vortices
                 }
                 else
                     Debug.LogWarning("[SessionManager] RoomGeometry no encontrado en Sala Environment.");
+            }
 
-                // Asignar audio de usuario (elementPaths) a los objetos marcados por AudioTargetMarker
+            yield return new WaitForSeconds(initializeTime);
+ 
+            // When done, configure controllers of the scene
+            Debug.Log("Busco Offline");
+            actualTransitionManager = GameObject.FindObjectOfType<SceneTransitionManager>(true);
+            categoryController = GameObject.FindObjectOfType<CategoryController>(true);
+            elementCategoryController = GameObject.FindObjectOfType<ElementCategoryController>(true);
+            loggingController = GameObject.FindObjectOfType<LoggingController>(true);
+            spawnController = GameObject.FindObjectOfType<SpawnController>(true);
+            righthandTools = GameObject.FindObjectOfType<RighthandTools>(true);
+
+            if (elementCategoryController != null) elementCategoryController.Initialize();
+            else Debug.LogWarning("[SessionManager] elementCategoryController no encontrado en escena.");
+            if (loggingController != null) loggingController.Initialize();
+            else Debug.LogWarning("[SessionManager] loggingController no encontrado en escena.");
+            if (spawnController != null) spawnController.Initialize();
+            else Debug.LogWarning("[SessionManager] spawnController no encontrado en escena.");
+ 
+            // Sala: AudioManager y RoomGeometry ya fueron configurados antes del WaitForSeconds.
+            // Solo queda asignar el audio de usuario a los objetos marcados.
+            if (environmentName == "Sala")
+            {
                 yield return StartCoroutine(AssignUserAudioCoroutine());
             }
  
