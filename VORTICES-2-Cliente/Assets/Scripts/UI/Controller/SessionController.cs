@@ -363,7 +363,15 @@ namespace Vortices
             sessionManager.sessionName = selectedSession;
             sessionManager.userId = selectedUserId;
             sessionManager.environmentName = selectedEnvironment;
-            sessionManager.isOnlineSession = isOnlineMode; // Enviar el modo online/offline
+            sessionManager.isOnlineSession = isOnlineMode;
+
+            // Sala no usa categorías — ir directo a su panel de configuración
+            if (selectedEnvironment == "Sala")
+            {
+                mainMenuPanel.ChangePanelEnvironment();
+                return;
+            }
+
             sessionManager.categoryController.Initialize();
             mainMenuPanel.ChangeVisibleComponent((int)MainMenuId.CategorySelection);
         }
