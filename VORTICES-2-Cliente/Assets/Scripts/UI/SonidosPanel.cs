@@ -64,7 +64,7 @@ namespace Vortices
         {
             instance = this;
             BuildUI();
-            SetVisible(true);
+            SetVisible(false);
         }
 
         private void Update()
@@ -111,6 +111,10 @@ namespace Vortices
             foreach ((AudioTargetMarker marker, AudioSource src) in sounds)
                 BuildRow(marker, src);
             initialized = true;
+        }
+
+        public void Show()
+        {
             SetVisible(true);
         }
 

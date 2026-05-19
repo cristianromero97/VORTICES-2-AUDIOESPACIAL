@@ -45,13 +45,22 @@ namespace Vortices
         private IEnumerator WaitForInit()
         {
             yield return new WaitForSeconds(sessionManager.initializeTime + 3.0f);
-            startButton.interactable = true;
+            if (sessionManager.environmentName != "Sala")
+                startButton.interactable = true;
             returnButton.interactable = true;
         }
 
-        public void Spawn ()
+        public void NotifyAudioReady()
         {
-            // Start the logger
+            startButton.interactable = true;
+        }
+
+        public void Spawn()
+        {
+            startButton.interactable = false;
+            SonidosPanel sonidosPanel = SonidosPanel.instance;
+            if (sonidosPanel != null)
+                sonidosPanel.Show();
             spawnController.StartSession(false, null);
             sessionManager.loggingController.LogSessionStatus("Start");
         }

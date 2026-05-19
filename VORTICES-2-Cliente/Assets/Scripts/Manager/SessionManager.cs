@@ -423,7 +423,8 @@ namespace Vortices
         {
             sessionLaunchRunning = true;
  
-            yield return StartCoroutine(DisconnectFromVivoxCoroutine());
+            if (isOnlineSession)
+                yield return StartCoroutine(DisconnectFromVivoxCoroutine());
  
             if (NetworkClient.isConnected)
             {
@@ -815,6 +816,14 @@ namespace Vortices
                 sonidosPanel.Initialize(assignedSounds);
             else
                 Debug.LogWarning("[SessionManager] SonidosPanel no encontrado en la escena Sala.");
+
+            Debug.Log($"[SessionManager] Todos los audios fueron asignados ({assignCount}). Listo para iniciar la experiencia.");
+
+            InfoPanel infoPanel = GameObject.FindObjectOfType<InfoPanel>(true);
+            if (infoPanel != null)
+                infoPanel.NotifyAudioReady();
+            else
+                Debug.LogWarning("[SessionManager] InfoPanel no encontrado — el botón Start no será habilitado.");
         }
 
         private IEnumerator LoadAudioClipCoroutine(string path, System.Action<AudioClip> onLoaded)
