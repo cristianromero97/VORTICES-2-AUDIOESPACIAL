@@ -51,6 +51,7 @@ namespace Vortices
         public bool volumetric;
         public Vector3Int dimension;
         public List<string> elementPaths;
+        public List<string> audioPaths;
         // Session Manager settings
         public float initializeTime = 2.0f;
         private bool sessionDataReceived = false;
@@ -386,6 +387,19 @@ namespace Vortices
             {
                 yield return StartCoroutine(AssignUserAudioCoroutine());
             }
+            else if (environmentName == "Museum")
+            {
+                AudioManager audioManager = GameObject.FindObjectOfType<AudioManager>(true);
+                if (audioManager != null)
+                    audioManager.SetConfigLevel(6);
+                else
+                    Debug.LogWarning("[SessionManager] AudioManager no encontrado en Museum Environment.");
+
+                if (audioPaths != null && audioPaths.Count > 0)
+                    yield return StartCoroutine(AssignUserAudioCoroutine(audioPaths));
+                else
+                    Debug.LogWarning("[SessionManager] audioPaths vacío — no se asignará audio en Museum.");
+            }
  
             inputController.RestartInputs();
  
@@ -513,6 +527,7 @@ namespace Vortices
             volumetric = false;
             dimension = Vector3Int.zero;
             elementPaths?.Clear();
+            audioPaths?.Clear();
             categoryController.UpdateCategoriesList(null);
             isOnlineSession = false;
             browsingMode = string.Empty;
@@ -699,11 +714,13 @@ namespace Vortices
  
  
  
-        private IEnumerator AssignUserAudioCoroutine()
+        private IEnumerator AssignUserAudioCoroutine(List<string> paths = null)
         {
-            if (elementPaths == null || elementPaths.Count == 0)
+            if (paths == null) paths = elementPaths;
+
+            if (paths == null || paths.Count == 0)
             {
-                Debug.LogWarning("[SessionManager] AssignUserAudio: elementPaths vacío, no se asigna audio de usuario.");
+                Debug.LogWarning("[SessionManager] AssignUserAudio: lista de paths vacía, no se asigna audio de usuario.");
                 yield break;
             }
 
@@ -735,15 +752,15 @@ namespace Vortices
             }
 
             // Asignación 1:1 — cada archivo a un objeto diferente, sin repetir
-            int assignCount = Mathf.Min(elementPaths.Count, markers.Count);
-            Debug.Log($"[SessionManager] AssignUserAudio: {elementPaths.Count} archivo(s), {markers.Count} objeto(s) elegibles → asignando {assignCount}.");
+            int assignCount = Mathf.Min(paths.Count, markers.Count);
+            Debug.Log($"[SessionManager] AssignUserAudio: {paths.Count} archivo(s), {markers.Count} objeto(s) elegibles → asignando {assignCount}.");
 
             var assignedSounds = new List<(AudioTargetMarker marker, AudioSource src)>();
 
             for (int i = 0; i < assignCount; i++)
             {
                 AudioTargetMarker marker = markers[i];
-                string path = elementPaths[i];
+                string path = paths[i];
 
                 AudioClip clip = null;
                 yield return StartCoroutine(LoadAudioClipCoroutine(path, loaded => clip = loaded));

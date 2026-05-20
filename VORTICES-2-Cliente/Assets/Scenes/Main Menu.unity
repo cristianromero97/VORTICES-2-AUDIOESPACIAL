@@ -30076,6 +30076,7 @@ MonoBehaviour:
   volumetric: 0
   dimension: {x: 0, y: 0, z: 0}
   elementPaths: []
+  audioPaths: []
   initializeTime: 8
   actualTransitionManager: {fileID: 1576242426}
   categoryController: {fileID: 1104882593}
