@@ -14,9 +14,9 @@ namespace Vortices
         // Prefabs
         [SerializeField] private GameObject environmenTogglePrefab;
         [SerializeField] private GameObject UISessionPrefab;
-        [Tooltip("Prefab del panel de configuración de Sala Environment.")]
-        [SerializeField] private GameObject salaPanelPrefab;
- 
+        // [Tooltip("Prefab del panel de configuración de Sala Environment.")]
+        // [SerializeField] private GameObject salaPanelPrefab;
+
         // Other references
         [SerializeField] private MainMenuPanel mainMenuPanel;
         [SerializeField] private GameObject scrollviewContent;
@@ -280,9 +280,9 @@ namespace Vortices
         {
             AddonsController.instance.LoadAddonObjects();
 
-            // Registrar Sala como entorno built-in (reemplaza la versión del bundle si existe)
-            if (salaPanelPrefab != null)
-                AddonsController.instance.RegisterBuiltInEnvironment("Sala Environment", salaPanelPrefab);
+            // // Registrar Sala como entorno built-in (reemplaza la versión del bundle si existe)
+            // if (salaPanelPrefab != null)
+            //     AddonsController.instance.RegisterBuiltInEnvironment("Sala Environment", salaPanelPrefab);
 
             // Load prefab to configuration menu
             for (int i = 0; i < AddonsController.instance.environmentObjects.Count; i++)

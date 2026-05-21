@@ -269,12 +269,18 @@ namespace Vortices
         {
             AddBrowserToComponents();
 
+            Cursor.visible = true;
+            Cursor.lockState = CursorLockMode.None;
+
             FileBrowser.SetFilters(true,
                 new FileBrowser.Filter("Audio", ".mp3", ".mp4", ".wav", ".ogg"));
 
             FileBrowser.ShowLoadDialog(
                 paths =>
                 {
+                    Cursor.visible = false;
+                    Cursor.lockState = CursorLockMode.Locked;
+
                     // Limitar a totalObjects archivos máximo
                     List<string> limited = new List<string>(paths);
                     if (limited.Count > totalObjects)
@@ -291,6 +297,9 @@ namespace Vortices
                     ChangeVisibleComponent((int)SalaId.BrowsingLocal);
                 },
                 () => {
+                    Cursor.visible = false;
+                    Cursor.lockState = CursorLockMode.Locked;
+
                     RemoveBrowserFromComponents();
                     ChangeVisibleComponent((int)SalaId.BrowsingLocal);
                 },

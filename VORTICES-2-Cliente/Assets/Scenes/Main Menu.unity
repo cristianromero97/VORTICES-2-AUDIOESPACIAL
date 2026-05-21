@@ -46516,7 +46516,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   environmenTogglePrefab: {fileID: 5478979919816914096, guid: 8fea939c12d7789499c803680cb7a788, type: 3}
   UISessionPrefab: {fileID: 6738731170053510558, guid: 92b31a871feb71c4391e0cab0aa150e8, type: 3}
-  salaPanelPrefab: {fileID: 882270953693080378, guid: f946dcc7dfa58524199f0b2d2f6428a7, type: 3}
   mainMenuPanel: {fileID: 7216537059914484286}
   scrollviewContent: {fileID: 3010055298211343597}
   sessionAddInputField: {fileID: 6269204158477863919}
