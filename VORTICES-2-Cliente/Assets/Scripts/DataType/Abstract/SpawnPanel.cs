@@ -39,6 +39,7 @@ namespace Vortices
         // UI Components will change according to user configurations one by one
         public void ChangeVisibleComponent(int componentId)
         {
+            if (!gameObject.activeInHierarchy) return; //Esto es para evitar que se ejecute el coroutine si el panel no está activo, lo que puede pasar si el usuario hace click en un botón justo antes de que el panel se desactive
             StartCoroutine(ChangeComponent(componentId));
         }
 

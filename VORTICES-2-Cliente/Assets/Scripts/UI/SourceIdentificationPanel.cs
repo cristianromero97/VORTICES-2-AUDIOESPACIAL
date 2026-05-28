@@ -38,8 +38,11 @@ namespace Vortices
         // ─────────────────────────────────────────────
         private enum PanelState { Idle, Q1Room, ConfirmRoom, Q2Object, ConfirmObject, Completed }
 
+        public static SourceIdentificationPanel instance;
+
         private PanelState        _state = PanelState.Idle;
         private AudioTargetMarker _currentMarker;
+        private AudioTargetMarker _activeMarker;   // marker cuyo "Emitir" fue presionado en SonidosPanel
         private string            _roomAnswer;
         private string            _objectAnswer;
         private readonly HashSet<AudioTargetMarker> _answered = new HashSet<AudioTargetMarker>();
@@ -55,6 +58,7 @@ namespace Vortices
 
         // Q1 — lista de salas (modo actual)
         private GameObject    _q1Section;
+        private ScrollRect    _roomScrollRect;
         private RectTransform _roomContentRT;
         private Transform     _roomListContent;
 
@@ -64,6 +68,7 @@ namespace Vortices
 
         // Q2 — lista de objetos
         private GameObject     _objectSection;
+        private ScrollRect     _objectScrollRect;
         private Transform      _objectListContent;
         private RectTransform  _objectContentRT;
 
@@ -81,12 +86,32 @@ namespace Vortices
         // ─────────────────────────────────────────────
         private void Awake()
         {
+            instance = this;
             BuildUI();
             SetVisible(false);
 
             _handKeyboard = FindObjectOfType<HandKeyboard>();
             if (_handKeyboard == null)
                 Debug.LogWarning("[SourceID] HandKeyboard no encontrado en la escena");
+        }
+
+        private void Start()
+        {
+            // Camera.main puede ser null en Awake con XR Origin — se asigna en Start
+            Camera cam = Camera.main;
+            if (cam == null) cam = FindObjectOfType<Camera>();
+            if (cam != null)
+            {
+                foreach (Canvas c in GetComponentsInParent<Canvas>(true))
+                {
+                    if (c.renderMode == RenderMode.WorldSpace && c.worldCamera == null)
+                        c.worldCamera = cam;
+                }
+            }
+            else
+            {
+                Debug.LogWarning("[SourceID] No se encontró ninguna cámara para asignar al Canvas.");
+            }
         }
 
         private void Update()
@@ -96,32 +121,40 @@ namespace Vortices
 
             if (_state == PanelState.Idle)
                 TryTriggerProximity(force: false);
+
+            // Mouse scroll wheel → scroll the active list (bypasses raycaster entirely)
+            float wheel = Input.mouseScrollDelta.y;
+            if (Mathf.Abs(wheel) > 0.001f)
+            {
+                ScrollRect active = _state == PanelState.Q1Room   ? _roomScrollRect :
+                                    _state == PanelState.Q2Object  ? _objectScrollRect : null;
+                if (active != null)
+                    active.verticalNormalizedPosition = Mathf.Clamp01(
+                        active.verticalNormalizedPosition + wheel * 0.08f);
+            }
         }
 
         // ─────────────────────────────────────────────
         //  Detección de proximidad
         // ─────────────────────────────────────────────
+        // API pública: SonidosPanel llama esto al presionar/silenciar Emitir
+        public void SetActiveMarker(AudioTargetMarker marker) => _activeMarker = marker;
+
         private void TryTriggerProximity(bool force)
         {
+            if (_activeMarker == null) return;
+            if (_activeMarker.userAudioSource == null) return;
+            if (_answered.Contains(_activeMarker)) return;
             if (Camera.main == null) return;
-            Vector3 cam = Camera.main.transform.position;
 
-            foreach (AudioTargetMarker marker in AudioTargetMarker.All)
-            {
-                if (marker == null || marker.userAudioSource == null) continue;
-                if (_answered.Contains(marker)) continue;
+            Vector3 cam  = Camera.main.transform.position;
+            Vector3 obj  = _activeMarker.transform.position;
+            float   dist = Vector2.Distance(
+                new Vector2(cam.x, cam.z),
+                new Vector2(obj.x, obj.z));
 
-                Vector3 obj  = marker.transform.position;
-                float   dist = Vector2.Distance(
-                    new Vector2(cam.x, cam.z),
-                    new Vector2(obj.x, obj.z));
-
-                if (force || dist <= proximityRadius)
-                {
-                    Trigger(marker);
-                    return;
-                }
-            }
+            if (force || dist <= proximityRadius)
+                Trigger(_activeMarker);
         }
 
         private void Trigger(AudioTargetMarker marker)
@@ -229,13 +262,16 @@ namespace Vortices
             Canvas.ForceUpdateCanvases();
             LayoutRebuilder.ForceRebuildLayoutImmediate(_roomContentRT);
 
-            // Navegación vertical entre botones
+            // Navegación vertical + auto-scroll al seleccionar
             for (int i = 0; i < buttons.Count; i++)
             {
                 Navigation nav = new Navigation { mode = Navigation.Mode.Explicit };
                 if (i > 0)                  nav.selectOnUp   = buttons[i - 1];
                 if (i < buttons.Count - 1)  nav.selectOnDown = buttons[i + 1];
                 buttons[i].navigation = nav;
+
+                ScrollOnSelect sos = buttons[i].gameObject.AddComponent<ScrollOnSelect>();
+                sos.scrollRect = _roomScrollRect;
             }
 
             if (buttons.Count > 0)
@@ -318,6 +354,9 @@ namespace Vortices
                 if (i > 0)                  nav.selectOnUp   = buttons[i - 1];
                 if (i < buttons.Count - 1)  nav.selectOnDown = buttons[i + 1];
                 buttons[i].navigation = nav;
+
+                ScrollOnSelect sos = buttons[i].gameObject.AddComponent<ScrollOnSelect>();
+                sos.scrollRect = _objectScrollRect;
             }
 
             if (buttons.Count > 0)
@@ -354,11 +393,7 @@ namespace Vortices
         private void OnRepeat()
         {
             _answered.Clear();
-            foreach (AudioTargetMarker m in AudioTargetMarker.All)
-            {
-                if (m.userAudioSource != null && !m.userAudioSource.isPlaying)
-                    m.userAudioSource.Play();
-            }
+            _activeMarker = null;   // debe presionar Emitir en SonidosPanel para reactivar
             SetVisible(false);
             _state = PanelState.Idle;
             Debug.Log("[SourceID] Actividad repetida — _answered limpiado, esperando nuevo trigger");
@@ -367,6 +402,7 @@ namespace Vortices
         private void OnFinalize()
         {
             _answered.Add(_currentMarker);
+            _activeMarker = null;   // requiere nuevo Emitir para el próximo audio
             LogResponse();
             SetVisible(false);
             _state = PanelState.Idle;
@@ -504,11 +540,23 @@ namespace Vortices
             // contNav.selectOnUp = _roomInputField;
             // _q1ContinueBtn.navigation = contNav;
 
+            // Botones de scroll arriba/abajo
+            GameObject roomScrollUp = MakeRect("ScrollUp", _q1Section.transform);
+            AnchorRect(roomScrollUp, 0.35f, 0.80f, 0.65f, 0.88f);
+            Button roomUpBtn = BuildButton(roomScrollUp.transform, "▲", new Color(0.2f, 0.3f, 0.6f, 0.9f));
+            roomUpBtn.onClick.AddListener(() => { if (_roomScrollRect != null) _roomScrollRect.verticalNormalizedPosition = Mathf.Clamp01(_roomScrollRect.verticalNormalizedPosition + 0.15f); });
+
+            GameObject roomScrollDown = MakeRect("ScrollDown", _q1Section.transform);
+            AnchorRect(roomScrollDown, 0.35f, 0f, 0.65f, 0.08f);
+            Button roomDownBtn = BuildButton(roomScrollDown.transform, "▼", new Color(0.2f, 0.3f, 0.6f, 0.9f));
+            roomDownBtn.onClick.AddListener(() => { if (_roomScrollRect != null) _roomScrollRect.verticalNormalizedPosition = Mathf.Clamp01(_roomScrollRect.verticalNormalizedPosition - 0.15f); });
+
             // Lista scrolleable de salas
             GameObject roomScrollGO = MakeRect("RoomScrollView", _q1Section.transform);
-            AnchorRect(roomScrollGO, 0f, 0f, 1f, 0.86f);
+            AnchorRect(roomScrollGO, 0f, 0.08f, 1f, 0.80f);
 
-            ScrollRect roomScroll = roomScrollGO.AddComponent<ScrollRect>();
+            _roomScrollRect = roomScrollGO.AddComponent<ScrollRect>();
+            ScrollRect roomScroll = _roomScrollRect;
             roomScroll.horizontal        = false;
             roomScroll.vertical          = true;
             roomScroll.scrollSensitivity = 30f;
@@ -554,10 +602,22 @@ namespace Vortices
                      new Color(0.75f, 0.85f, 1f), stretch: true);
             qObjTxt.overflowMode = TextOverflowModes.Overflow;
 
-            GameObject scrollGO = MakeRect("ScrollView", _objectSection.transform);
-            AnchorRect(scrollGO, 0f, 0f, 1f, 0.81f);
+            // Botones de scroll arriba/abajo para objetos
+            GameObject objScrollUp = MakeRect("ScrollUp", _objectSection.transform);
+            AnchorRect(objScrollUp, 0.35f, 0.75f, 0.65f, 0.83f);
+            Button objUpBtn = BuildButton(objScrollUp.transform, "▲", new Color(0.2f, 0.3f, 0.6f, 0.9f));
+            objUpBtn.onClick.AddListener(() => { if (_objectScrollRect != null) _objectScrollRect.verticalNormalizedPosition = Mathf.Clamp01(_objectScrollRect.verticalNormalizedPosition + 0.15f); });
 
-            ScrollRect scroll = scrollGO.AddComponent<ScrollRect>();
+            GameObject objScrollDown = MakeRect("ScrollDown", _objectSection.transform);
+            AnchorRect(objScrollDown, 0.35f, 0f, 0.65f, 0.08f);
+            Button objDownBtn = BuildButton(objScrollDown.transform, "▼", new Color(0.2f, 0.3f, 0.6f, 0.9f));
+            objDownBtn.onClick.AddListener(() => { if (_objectScrollRect != null) _objectScrollRect.verticalNormalizedPosition = Mathf.Clamp01(_objectScrollRect.verticalNormalizedPosition - 0.15f); });
+
+            GameObject scrollGO = MakeRect("ScrollView", _objectSection.transform);
+            AnchorRect(scrollGO, 0f, 0.08f, 1f, 0.75f);
+
+            _objectScrollRect = scrollGO.AddComponent<ScrollRect>();
+            ScrollRect scroll = _objectScrollRect;
             scroll.horizontal        = false;
             scroll.vertical          = true;
             scroll.scrollSensitivity = 30f;
@@ -745,5 +805,44 @@ namespace Vortices
             rt.anchorMin = new Vector2(xMin, yMin); rt.anchorMax = new Vector2(xMax, yMax);
             rt.offsetMin = Vector2.zero; rt.offsetMax = Vector2.zero;
         }
+
+    }
+}
+
+// Componente auxiliar: auto-scrollea el ScrollRect cuando este botón es seleccionado.
+// Implementa solo ISelectHandler para NO interferir con los eventos de drag/scroll del ScrollRect.
+public class ScrollOnSelect : MonoBehaviour, UnityEngine.EventSystems.ISelectHandler
+{
+    public ScrollRect scrollRect;
+
+    public void OnSelect(UnityEngine.EventSystems.BaseEventData eventData)
+    {
+        if (scrollRect == null) return;
+        Canvas.ForceUpdateCanvases();
+
+        RectTransform contentRT  = scrollRect.content;
+        RectTransform viewportRT = scrollRect.viewport;
+        RectTransform itemRT     = GetComponent<RectTransform>();
+
+        float contentHeight  = contentRT.rect.height;
+        float viewportHeight = viewportRT.rect.height;
+        if (contentHeight <= viewportHeight) return;
+
+        float scrollableRange = contentHeight - viewportHeight;
+        float itemLocalY      = contentRT.InverseTransformPoint(itemRT.position).y;
+        float itemTop         = -itemLocalY;
+        float itemBottom      = itemTop + itemRT.rect.height;
+
+        float currentTop    = (1f - scrollRect.verticalNormalizedPosition) * scrollableRange;
+        float currentBottom = currentTop + viewportHeight;
+
+        float newTop = currentTop;
+        if (itemTop < currentTop)
+            newTop = itemTop;
+        else if (itemBottom > currentBottom)
+            newTop = itemBottom - viewportHeight;
+
+        newTop = Mathf.Clamp(newTop, 0f, scrollableRange);
+        scrollRect.verticalNormalizedPosition = 1f - (newTop / scrollableRange);
     }
 }

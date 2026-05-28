@@ -1,0 +1,2 @@
+sessionName,userId,soundFile,actualObject,actualRoom,answeredRoom,answeredObject,correctRoom,correctObject,timestamp
+Prueba3,1,Audio 3,Television 1,2,7,Television 1,False,True,2026-05-25 09:14:41

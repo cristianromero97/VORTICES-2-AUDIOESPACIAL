@@ -74,10 +74,46 @@
 
     "roomTitle": "Configure the rooms in the environment",
     "roomDescription": "You can choose the minimum and maximum number of rooms within the environment.\nYou will also be shown the total number of objects found.",
+    "minimum": "minimum rooms:",
+    "maximum": "maximum rooms:",
+    "example": "For example 6",
+    "example2": "For example 12",
+    "example3": "For example 40",
+    "example4": "For example 1",
+    
     "objectSelectTitle": "Select the objects to load audio",
     "audioManagerTitle": "Configure the acoustic immersion control",
+    "objectStatus" : "Please, more objects need to be selected!",
+    "objectStatusReady" : " objects selected — ready!",
+    "objectsFound" : "objects have been found",
 
     "audioConfigTitle": "Configure the audio settings for the session",
     "audioConfigDescription": "You can configure the volume, the minimum and maximum playback distance, and apply room filters.",
-    "tutorialActivityTitle" : "Create a direction for the tutorial activity"
+    "tutorialActivityTitle" : "Create a direction for the tutorial activity",
+    "directionStatus" : "Create and select at least one direction to continue.",
+    "directionStatusReady" : " direction(s) selected — ready!",
+
+    "configLevel": "config level",
+    "rolloffMode": "Rolloff mode",
+    "dopplerLevel": "Doppler level",
+    "spread": "Spread (grade)",
+    "spatialBlend": "Spatial blend",
+    "spatialize": "Spatialize",
+    
+    "volumeGeneral": "General volume",
+    "minConfigLevel": "Min config level",
+    "minDistance": "Min distance",
+    "maxDistance": "Max distance",
+    "filterRoom": "Filter Room Activate",
+    "newDirection": "New Direction...",
+
+
+    "audioEspacialTitle": "Spatial Audio",
+    "audioEspacialSettings": "Advanced Settings",
+    "audioEspacialNoFiles": "No files selected",
+    "audioEspacialFilesSelected": " file(s) selected",
+    "audioEspacialBrowse": "Browse",
+    "audioEspacialSave": "Save audio configuration",
+    "audioConfigDescription2": "You can configure the volume, minimum and maximum playback distance for any environment.",
+    "audioLoadedDescription": "Upload the audio files to continue with the immersion level setup."
 }

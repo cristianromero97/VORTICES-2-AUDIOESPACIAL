@@ -145,6 +145,7 @@ namespace Vortices
  
         // Teclado VR
         private HandKeyboard _handKeyboard;
+        private Coroutine    _removeKeyboardCoroutine;
 
         private void OnEnable()
         {
@@ -190,6 +191,7 @@ namespace Vortices
 
         private void OnDisable()
         {
+            if (_removeKeyboardCoroutine != null) StopCoroutine(_removeKeyboardCoroutine);
             _handKeyboard?.RemoveInputField();
             ClearKeyboard(minRoomsInput);
             ClearKeyboard(maxRoomsInput);
@@ -204,8 +206,24 @@ namespace Vortices
         {
             if (field == null || _handKeyboard == null) return;
             HandKeyboard kb = _handKeyboard;
-            field.onSelect.AddListener(_ => kb.SetInputField(field));
-            field.onDeselect.AddListener(_ => kb.RemoveInputField());
+            field.onSelect.AddListener(_ =>
+            {
+                // Cancelar cualquier remove pendiente y mostrar teclado
+                if (_removeKeyboardCoroutine != null) StopCoroutine(_removeKeyboardCoroutine);
+                kb.SetInputField(field);
+            });
+            field.onDeselect.AddListener(_ =>
+            {
+                // Esperar un frame antes de ocultar — si hay otro onSelect llegando lo cancela
+                _removeKeyboardCoroutine = StartCoroutine(DelayedRemoveKeyboard(kb));
+            });
+        }
+
+        private IEnumerator DelayedRemoveKeyboard(HandKeyboard kb)
+        {
+            yield return null; // esperar un frame
+            kb.RemoveInputField();
+            _removeKeyboardCoroutine = null;
         }
 
         private void ClearKeyboard(TMP_InputField field)
@@ -256,7 +274,12 @@ namespace Vortices
             }
 
             if (totalObjectsText != null)
-                totalObjectsText.text = $"{totalObjects} objects have been found";
+            {
+                string foundLabel = LocalizationController.instance != null
+                    ? LocalizationController.instance.FetchString("baseStrings", "objectsFound")
+                    : "objects have been found";
+                totalObjectsText.text = $"{totalObjects} {foundLabel}";
+            }
 
             BlockButton((int)SalaId.RoomConfig);
         }
@@ -424,9 +447,14 @@ namespace Vortices
             if (objectSelectionStatusText != null)
             {
                 if (totalSelectedObjects < audioCount)
-                    objectSelectionStatusText.text = "Please, more objects need to be selected!";
+                    objectSelectionStatusText.text = LocalizationController.instance != null
+                        ? LocalizationController.instance.FetchString("baseStrings", "objectStatus")
+                        : "Please, more objects need to be selected!";
                 else
-                    objectSelectionStatusText.text = $"{totalSelectedObjects} objects selected — ready!";
+                    objectSelectionStatusText.text = totalSelectedObjects +
+                        (LocalizationController.instance != null
+                        ? LocalizationController.instance.FetchString("baseStrings", "objectStatusReady")
+                        : " objects selected — ready!");
             }
  
             BlockButton((int)SalaId.ObjectSelection);
@@ -448,7 +476,7 @@ namespace Vortices
         private static readonly float[] DefaultSpatialBlend = { 0f,   0f,   0.4f, 1f,  1f,  1f   };
         private static readonly float[] DefaultSpread       = { 180f, 180f, 90f,  30f, 0f,  0f   };
         private static readonly float[] DefaultDoppler      = { 0f,   0f,   0f,   0f,  1f,  3f   };
-        private static readonly int[]   DefaultRolloff      = { 1,    1,    0,    2,   2,   2    }; // 0=Logarithmic,1=Linear,2=Custom
+        private static readonly int[]   DefaultRolloff      = { 1,    1,    0,    0,   2,   2    }; // 0=Logarithmic,1=Linear,2=Custom
         private static readonly bool[]  DefaultSpatialize   = { false,false,false,false,true,true };
 
         private void SetupStep4Defaults()
@@ -475,6 +503,11 @@ namespace Vortices
                     RefreshImmersionSliders();
                 });
             }
+
+            // Configurar rangos correctos de cada slider
+            if (spatialBlendSlider != null) { spatialBlendSlider.minValue = 0f;   spatialBlendSlider.maxValue = 1f;   }
+            if (spreadSlider       != null) { spreadSlider.minValue       = 0f;   spreadSlider.maxValue       = 360f; }
+            if (dopplerSlider      != null) { dopplerSlider.minValue      = 0f;   dopplerSlider.maxValue      = 5f;   }
 
             RefreshImmersionSliders();
 
@@ -707,9 +740,21 @@ namespace Vortices
                 if (pair.Value) selected++;
 
             if (directionSelectionStatusText != null)
-                directionSelectionStatusText.text = selected > 0
-                    ? $"{selected} direction(s) selected — ready!"
-                    : "Select at least one direction to continue.";
+            {
+                if (selected > 0)
+                {
+                    string readyMsg = LocalizationController.instance != null
+                        ? LocalizationController.instance.FetchString("baseStrings", "directionStatusReady")
+                        : " direction(s) selected — ready!";
+                    directionSelectionStatusText.text = $"{selected}{readyMsg}";
+                }
+                else
+                {
+                    directionSelectionStatusText.text = LocalizationController.instance != null
+                        ? LocalizationController.instance.FetchString("baseStrings", "directionStatus")
+                        : "Select at least one direction to continue.";
+                }
+            }
 
             BlockButton((int)SalaId.ActivityDirection);
         }

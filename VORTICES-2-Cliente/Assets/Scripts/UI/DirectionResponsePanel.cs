@@ -33,6 +33,10 @@ namespace Vortices
 
         private GameObject        _selectionSection;
         private Transform         _buttonContainer;
+        private RectTransform     _dirContentRT;
+        private ScrollRect        _directionScrollRect;
+        // private Button            _muteBtn;
+        // private TextMeshProUGUI   _muteBtnLabel;
 
         private GameObject        _confirmSection;
         private TextMeshProUGUI   _confirmText;
@@ -54,7 +58,17 @@ namespace Vortices
 
         private void Update()
         {
-            if (!_isVisible || _state != PanelState.Selecting || _activeDirections == null) return;
+            if (!_isVisible) return;
+
+            if (_state == PanelState.Selecting)
+            {
+                float wheel = Input.mouseScrollDelta.y;
+                if (Mathf.Abs(wheel) > 0.001f && _directionScrollRect != null)
+                    _directionScrollRect.verticalNormalizedPosition = Mathf.Clamp01(
+                        _directionScrollRect.verticalNormalizedPosition + wheel * 0.08f);
+            }
+
+            if (_state != PanelState.Selecting || _activeDirections == null) return;
             for (int i = 0; i < _activeDirections.Count && i < 9; i++)
             {
                 if (Input.GetKeyDown(KeyCode.Alpha1 + i))
@@ -81,6 +95,13 @@ namespace Vortices
                 _titleText.text = $"\"{marker.audioFileName}\"";
 
             BuildDirectionButtons();
+            Canvas.ForceUpdateCanvases();
+            if (_dirContentRT != null)
+                LayoutRebuilder.ForceRebuildLayoutImmediate(_dirContentRT);
+            if (_directionScrollRect != null)
+                _directionScrollRect.verticalNormalizedPosition = 1f;
+            // if (_muteBtn != null) { _muteBtn.interactable = true; }
+            // if (_muteBtnLabel != null) _muteBtnLabel.text = "Silenciar audio";
             EnterState(PanelState.Selecting);
             SetVisible(true);
         }
@@ -169,6 +190,13 @@ namespace Vortices
             _selectedDirection = direction;
             EnterState(PanelState.ConfirmAnswer);
         }
+
+        // private void OnMuteClicked()
+        // {
+        //     _sonidosPanel?.MuteCurrentAudio();
+        //     if (_muteBtn != null) _muteBtn.interactable = false;
+        //     if (_muteBtnLabel != null) _muteBtnLabel.text = "Audio silenciado";
+        // }
 
         private void OnYes()  => EnterState(PanelState.Completed);
 
@@ -269,7 +297,9 @@ namespace Vortices
             rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one;
             rt.offsetMin = Vector2.zero; rt.offsetMax = Vector2.zero;
 
-            MakeImage("Overlay", transform, new Color(0f, 0f, 0f, 0.75f), stretch: true);
+            // Overlay oscurece visualmente pero no intercepta clicks (SonidosPanel sigue accesible)
+            GameObject overlay = MakeImage("Overlay", transform, new Color(0f, 0f, 0f, 0.75f), stretch: true);
+            overlay.GetComponent<Image>().raycastTarget = false;
 
             GameObject panel = MakeRect("Panel", transform);
             RectTransform panelRT = panel.GetComponent<RectTransform>();
@@ -306,17 +336,62 @@ namespace Vortices
                          new Color(0.75f, 0.85f, 1f), stretch: true);
             qTxt.overflowMode = TextOverflowModes.Overflow;
 
-            GameObject btnArea = MakeRect("BtnArea", _selectionSection.transform);
-            AnchorRect(btnArea, 0.05f, 0.04f, 0.95f, 0.87f);
-            VerticalLayoutGroup vlg = btnArea.AddComponent<VerticalLayoutGroup>();
-            vlg.spacing                = 20f;
-            vlg.padding                = new RectOffset(10, 10, 10, 10);
+            // // Botón silenciar audio (descomentar si SonidosPanel vuelve a bloquearse)
+            // GameObject muteArea = MakeRect("MuteArea", _selectionSection.transform);
+            // AnchorRect(muteArea, 0.1f, 0.84f, 0.9f, 0.91f);
+            // _muteBtn = BuildButton(muteArea.transform, "Silenciar audio", new Color(0.6f, 0.18f, 0.1f, 1f));
+            // _muteBtnLabel = _muteBtn.GetComponentInChildren<TextMeshProUGUI>();
+            // _muteBtn.onClick.AddListener(OnMuteClicked);
+
+            // ▲/▼ botones de scroll
+            GameObject dirScrollUp = MakeRect("ScrollUp", _selectionSection.transform);
+            AnchorRect(dirScrollUp, 0.2f, 0.81f, 0.8f, 0.88f);
+            Button dirUpBtn = BuildButton(dirScrollUp.transform, "▲", new Color(0.2f, 0.3f, 0.6f, 0.9f));
+            dirUpBtn.onClick.AddListener(() => { if (_directionScrollRect != null) _directionScrollRect.verticalNormalizedPosition = Mathf.Clamp01(_directionScrollRect.verticalNormalizedPosition + 0.2f); });
+
+            GameObject dirScrollDown = MakeRect("ScrollDown", _selectionSection.transform);
+            AnchorRect(dirScrollDown, 0.2f, 0.01f, 0.8f, 0.08f);
+            Button dirDownBtn = BuildButton(dirScrollDown.transform, "▼", new Color(0.2f, 0.3f, 0.6f, 0.9f));
+            dirDownBtn.onClick.AddListener(() => { if (_directionScrollRect != null) _directionScrollRect.verticalNormalizedPosition = Mathf.Clamp01(_directionScrollRect.verticalNormalizedPosition - 0.2f); });
+
+            // ScrollRect para la lista de direcciones
+            GameObject dirScrollGO = MakeRect("DirScrollView", _selectionSection.transform);
+            AnchorRect(dirScrollGO, 0.03f, 0.08f, 0.97f, 0.81f);
+
+            _directionScrollRect = dirScrollGO.AddComponent<ScrollRect>();
+            _directionScrollRect.horizontal        = false;
+            _directionScrollRect.vertical          = true;
+            _directionScrollRect.scrollSensitivity = 30f;
+
+            GameObject dirViewport = MakeRect("Viewport", dirScrollGO.transform);
+            StretchFill(dirViewport);
+            dirViewport.AddComponent<Image>().color = Color.white;
+            dirViewport.AddComponent<Mask>().showMaskGraphic = false;
+            _directionScrollRect.viewport = dirViewport.GetComponent<RectTransform>();
+
+            GameObject dirContent = MakeRect("Content", dirViewport.transform);
+            _dirContentRT = dirContent.GetComponent<RectTransform>();
+            _dirContentRT.anchorMin = new Vector2(0f, 1f);
+            _dirContentRT.anchorMax = new Vector2(1f, 1f);
+            _dirContentRT.pivot     = new Vector2(0.5f, 1f);
+            _dirContentRT.offsetMin = Vector2.zero;
+            _dirContentRT.offsetMax = Vector2.zero;
+            dirContent.AddComponent<Image>().color = Color.clear;
+
+            VerticalLayoutGroup vlg = dirContent.AddComponent<VerticalLayoutGroup>();
+            vlg.spacing                = 15f;
+            vlg.padding                = new RectOffset(10, 10, 8, 8);
             vlg.childAlignment         = TextAnchor.UpperCenter;
             vlg.childForceExpandWidth  = true;
             vlg.childForceExpandHeight = false;
             vlg.childControlWidth      = true;
             vlg.childControlHeight     = true;
-            _buttonContainer = btnArea.transform;
+
+            ContentSizeFitter dirCsf = dirContent.AddComponent<ContentSizeFitter>();
+            dirCsf.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+            _directionScrollRect.content = _dirContentRT;
+            _buttonContainer = dirContent.transform;
 
             // ── Sección confirmación ──────────────────
             _confirmSection = MakeRect("ConfirmSection", panel.transform);

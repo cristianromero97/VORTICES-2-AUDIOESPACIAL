@@ -35,8 +35,10 @@ namespace Vortices
         // ─────────────────────────────────────────────
         //  UI runtime
         // ─────────────────────────────────────────────
-        private CanvasGroup panelGroup;
-        private Transform   rowContainer;
+        private CanvasGroup   panelGroup;
+        private ScrollRect    _sonidosScrollRect;
+        private RectTransform _sonidosContentRT;
+        private Transform     rowContainer;
         private readonly List<SoundRow> rows = new List<SoundRow>();
 
         public static SonidosPanel instance;
@@ -70,6 +72,12 @@ namespace Vortices
         private void Update()
         {
             if (!initialized) return;
+
+            // Mouse scroll wheel para la lista de sonidos
+            float wheel = Input.mouseScrollDelta.y;
+            if (Mathf.Abs(wheel) > 0.001f && _sonidosScrollRect != null && !proximityTriggered)
+                _sonidosScrollRect.verticalNormalizedPosition = Mathf.Clamp01(
+                    _sonidosScrollRect.verticalNormalizedPosition + wheel * 0.08f);
 
             // Navegación por teclado (solo cuando el panel de direcciones NO está activo)
             if (!proximityTriggered && rows.Count > 0)
@@ -110,6 +118,13 @@ namespace Vortices
             ClearRows();
             foreach ((AudioTargetMarker marker, AudioSource src) in sounds)
                 BuildRow(marker, src);
+
+            Canvas.ForceUpdateCanvases();
+            if (_sonidosContentRT != null)
+                LayoutRebuilder.ForceRebuildLayoutImmediate(_sonidosContentRT);
+            if (_sonidosScrollRect != null)
+                _sonidosScrollRect.verticalNormalizedPosition = 1f;
+
             initialized = true;
         }
 
@@ -117,6 +132,8 @@ namespace Vortices
         {
             SetVisible(true);
         }
+
+        public void MuteCurrentAudio() => StopCurrent();
 
         public void OnDirectionResponded()
         {
@@ -162,13 +179,12 @@ namespace Vortices
         // ─────────────────────────────────────────────
         private void TriggerProximity()
         {
-            proximityTriggered = true;
-            SetVisible(false);
-
             if (directionPanel != null)
+            {
+                proximityTriggered = true;
                 directionPanel.Show(currentMarker, this);
-            else
-                Debug.LogWarning("[SonidosPanel] DirectionResponsePanel no asignado en Inspector.");
+            }
+            // Si no hay DirectionResponsePanel (ej: Museum), no se bloquea la navegación
         }
 
         private void OnEmitirClicked(SoundRow row)
@@ -193,6 +209,8 @@ namespace Vortices
 
             row.buttonLabel.text   = "Silenciar";
             row.button.image.color = new Color(0.72f, 0.26f, 0.1f, 1f);
+
+            SourceIdentificationPanel.instance?.SetActiveMarker(row.marker);
         }
 
         private void StopCurrent()
@@ -213,6 +231,8 @@ namespace Vortices
             currentSrc         = null;
             currentMarker      = null;
             proximityTriggered = false;
+
+            SourceIdentificationPanel.instance?.SetActiveMarker(null);
         }
 
         private void ClearRows()
@@ -276,13 +296,44 @@ namespace Vortices
                       FontStyles.Italic, TextAlignmentOptions.Center,
                       new Color(0.5f, 0.5f, 0.6f), stretch: true);
 
-            // Contenedor de filas — sin scroll para evitar problemas de Mask
-            GameObject itemContainer = MakeRect("ItemContainer", transform);
-            AnchorRect(itemContainer, 0f, 0f, 1f, 0.84f);
-            itemContainer.GetComponent<RectTransform>().offsetMin = new Vector2(8f, 8f);
-            itemContainer.GetComponent<RectTransform>().offsetMax = new Vector2(-8f, -8f);
+            // ▲/▼ botones de scroll
+            GameObject sndScrollUp = MakeRect("ScrollUp", transform);
+            AnchorRect(sndScrollUp, 0.2f, 0.79f, 0.8f, 0.84f);
+            Button sndUpBtn = BuildScrollButton(sndScrollUp.transform, "▲");
+            sndUpBtn.onClick.AddListener(() => { if (_sonidosScrollRect != null) _sonidosScrollRect.verticalNormalizedPosition = Mathf.Clamp01(_sonidosScrollRect.verticalNormalizedPosition + 0.2f); });
 
-            VerticalLayoutGroup vlg = itemContainer.AddComponent<VerticalLayoutGroup>();
+            GameObject sndScrollDown = MakeRect("ScrollDown", transform);
+            AnchorRect(sndScrollDown, 0.2f, 0f, 0.8f, 0.05f);
+            Button sndDownBtn = BuildScrollButton(sndScrollDown.transform, "▼");
+            sndDownBtn.onClick.AddListener(() => { if (_sonidosScrollRect != null) _sonidosScrollRect.verticalNormalizedPosition = Mathf.Clamp01(_sonidosScrollRect.verticalNormalizedPosition - 0.2f); });
+
+            // ScrollRect para la lista de sonidos
+            GameObject sndScrollGO = MakeRect("SonidosScrollView", transform);
+            AnchorRect(sndScrollGO, 0f, 0.05f, 1f, 0.79f);
+            sndScrollGO.GetComponent<RectTransform>().offsetMin = new Vector2(6f, 0f);
+            sndScrollGO.GetComponent<RectTransform>().offsetMax = new Vector2(-6f, 0f);
+
+            _sonidosScrollRect = sndScrollGO.AddComponent<ScrollRect>();
+            _sonidosScrollRect.horizontal        = false;
+            _sonidosScrollRect.vertical          = true;
+            _sonidosScrollRect.scrollSensitivity = 30f;
+
+            GameObject sndViewport = MakeRect("Viewport", sndScrollGO.transform);
+            StretchFill(sndViewport);
+            sndViewport.AddComponent<Image>().color = Color.white;
+            sndViewport.AddComponent<Mask>().showMaskGraphic = false;
+            _sonidosScrollRect.viewport = sndViewport.GetComponent<RectTransform>();
+
+            GameObject sndContent = MakeRect("Content", sndViewport.transform);
+            _sonidosContentRT = sndContent.GetComponent<RectTransform>();
+            _sonidosContentRT.anchorMin = new Vector2(0f, 1f);
+            _sonidosContentRT.anchorMax = new Vector2(1f, 1f);
+            _sonidosContentRT.pivot     = new Vector2(0.5f, 1f);
+            _sonidosContentRT.offsetMin = Vector2.zero;
+            _sonidosContentRT.offsetMax = Vector2.zero;
+            sndContent.AddComponent<Image>().color = Color.clear;
+
+            VerticalLayoutGroup vlg = sndContent.AddComponent<VerticalLayoutGroup>();
             vlg.spacing                = 10f;
             vlg.padding                = new RectOffset(8, 8, 8, 8);
             vlg.childAlignment         = TextAnchor.UpperCenter;
@@ -291,7 +342,11 @@ namespace Vortices
             vlg.childControlWidth      = true;
             vlg.childControlHeight     = true;
 
-            rowContainer = itemContainer.transform;
+            ContentSizeFitter sndCsf = sndContent.AddComponent<ContentSizeFitter>();
+            sndCsf.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+            _sonidosScrollRect.content = _sonidosContentRT;
+            rowContainer = sndContent.transform;
         }
 
         private void BuildRow(AudioTargetMarker marker, AudioSource src)
@@ -391,6 +446,24 @@ namespace Vortices
             RectTransform rt = go.GetComponent<RectTransform>();
             rt.anchorMin = new Vector2(xMin, yMin); rt.anchorMax = new Vector2(xMax, yMax);
             rt.offsetMin = Vector2.zero; rt.offsetMax = Vector2.zero;
+        }
+
+        private static Button BuildScrollButton(Transform parent, string label)
+        {
+            Color bg = new Color(0.2f, 0.3f, 0.6f, 0.9f);
+            GameObject go = MakeRect("Btn_" + label, parent);
+            StretchFill(go);
+            go.AddComponent<Image>().color = bg;
+            Button btn = go.AddComponent<Button>();
+            ColorBlock cb = btn.colors;
+            cb.normalColor      = bg;
+            cb.highlightedColor = Color.Lerp(bg, Color.white, 0.28f);
+            cb.pressedColor     = Color.Lerp(bg, Color.black, 0.28f);
+            cb.selectedColor    = cb.highlightedColor;
+            btn.colors = cb;
+            MakeText("BtnLabel", go.transform, label, 52f,
+                      FontStyles.Bold, TextAlignmentOptions.Center, Color.white, stretch: true);
+            return btn;
         }
     }
 }

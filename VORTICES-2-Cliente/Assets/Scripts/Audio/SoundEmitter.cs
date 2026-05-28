@@ -50,7 +50,7 @@ namespace Vortices
  
         [Header("Espacialización")]
         [Tooltip("Garantiza atenuación por distancia incluso en niveles con spatialBlend bajo.")]
-        [SerializeField] private bool enforceDistanceAttenuation = true;
+        [SerializeField] private bool enforceDistanceAttenuation = true; //Esto debe estar en false con splatial blen 1 y linear para nivel 1 y 2
  
         [Tooltip("SpatialBlend mínimo cuando enforceDistanceAttenuation está activo.")]
         [SerializeField, Range(0f, 1f)] private float minimumSpatialBlend = 0.1f;

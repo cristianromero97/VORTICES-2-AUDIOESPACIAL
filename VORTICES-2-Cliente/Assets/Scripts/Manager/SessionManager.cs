@@ -387,18 +387,24 @@ namespace Vortices
             {
                 yield return StartCoroutine(AssignUserAudioCoroutine());
             }
-            else if (environmentName == "Museum")
+            else if (environmentName == "Museum" || environmentName == "Circular")
             {
+                // Aplicar configLevel y override acústico del AudioSpatialPanel (Options)
                 AudioManager audioManager = GameObject.FindObjectOfType<AudioManager>(true);
                 if (audioManager != null)
-                    audioManager.SetConfigLevel(6);
+                {
+                    audioManager.SetConfigLevel(configLevel);
+                    if (hasAcousticOverride)
+                        audioManager.ApplyProfileOverride(configLevel, acousticOverride);
+                }
                 else
-                    Debug.LogWarning("[SessionManager] AudioManager no encontrado en Museum Environment.");
+                    Debug.LogWarning($"[SessionManager] AudioManager no encontrado en {environmentName} Environment.");
 
+                // Asignar los archivos de audio configurados en AudioSpatialPanel
                 if (audioPaths != null && audioPaths.Count > 0)
                     yield return StartCoroutine(AssignUserAudioCoroutine(audioPaths));
                 else
-                    Debug.LogWarning("[SessionManager] audioPaths vacío — no se asignará audio en Museum.");
+                    Debug.LogWarning($"[SessionManager] audioPaths vacío — no se asignará audio en {environmentName}.");
             }
  
             inputController.RestartInputs();
@@ -736,6 +742,9 @@ namespace Vortices
             foreach (AudioTargetMarker m in allMarkers)
                 if (m != null && m.gameObject != null) markers.Add(m);
 
+            if (AudioManager.Instance == null)
+                Debug.LogWarning("[SessionManager] AssignUserAudio: AudioManager.Instance es null — se usará fallback (Custom rolloff, sin perfil acústico).");
+
             if (markers.Count == 0)
             {
                 Debug.LogWarning("[SessionManager] AssignUserAudio: no se encontraron AudioTargetMarker válidos en la escena.");
@@ -795,17 +804,30 @@ namespace Vortices
                     src.spatialBlend = profile.spatialBlend;
                     src.spread       = profile.spread;
                     src.dopplerLevel = profile.dopplerLevel;
-                    src.rolloffMode  = profile.rolloffMode;
                     src.spatialize   = profile.spatialize;
                     src.volume       = emitterBaseVolume * profile.globalVolume;
+
                     if (profile.rolloffMode == AudioRolloffMode.Custom && profile.customRolloffCurve != null)
+                    {
+                        src.rolloffMode = AudioRolloffMode.Custom;
                         src.SetCustomCurve(AudioSourceCurveType.CustomRolloff, profile.customRolloffCurve);
+                    }
+                    else if (profile.rolloffMode == AudioRolloffMode.Custom)
+                    {
+                        // Custom sin curva definida → usar Logarithmic para evitar volumen 0
+                        src.rolloffMode = AudioRolloffMode.Logarithmic;
+                        Debug.LogWarning($"[SessionManager] Perfil '{profile.levelName}' usa Custom rolloff sin curva → usando Logarithmic.");
+                    }
+                    else
+                    {
+                        src.rolloffMode = profile.rolloffMode;
+                    }
                 }
                 else
                 {
                     // Fallback si no hay AudioManager activo (ej: test directo en Sala sin pasar por menú)
                     src.spatialBlend = 1f;
-                    src.rolloffMode  = AudioRolloffMode.Custom;
+                    src.rolloffMode  = AudioRolloffMode.Logarithmic;
                     src.volume       = emitterBaseVolume;
                 }
 
@@ -817,6 +839,7 @@ namespace Vortices
 
                 assignedSounds.Add((marker, src));
                 Debug.Log($"[SessionManager] AssignUserAudio: Room {marker.roomIndex} ({marker.prefabType}) ← {System.IO.Path.GetFileName(path)}");
+                Debug.Log($"[SessionManager] AudioSource config → pos={marker.transform.position:F1}, vol={src.volume:F2}, spatialBlend={src.spatialBlend:F2}, minDist={src.minDistance}, rolloff={src.rolloffMode}, perfil={(AudioManager.Instance?.GetAcousticProfile(configLevel)?.levelName ?? "FALLBACK")}");
             }
 
             if (markers.Count > assignCount)
@@ -832,7 +855,7 @@ namespace Vortices
             if (sonidosPanel != null)
                 sonidosPanel.Initialize(assignedSounds);
             else
-                Debug.LogWarning("[SessionManager] SonidosPanel no encontrado en la escena Sala.");
+                Debug.LogWarning($"[SessionManager] SonidosPanel no encontrado en la escena {environmentName}.");
 
             Debug.Log($"[SessionManager] Todos los audios fueron asignados ({assignCount}). Listo para iniciar la experiencia.");
 

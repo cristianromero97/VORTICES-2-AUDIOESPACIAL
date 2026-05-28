@@ -70,5 +70,49 @@
 
     "loading": "Cargando...",
 
-    "empty": ""
+    "empty": "",
+
+    "roomTitle": "Configura las salas del entorno",
+    "roomDescription": "Puedes elegir el número mínimo y máximo de salas dentro del entorno.\nTambién se te mostrará el número total de objetos encontrados.",
+    "minimum" : "Salas mínimas:",
+    "maximum" : "Salas máximas:",
+    "example": "Por ejemplo 6",
+    "example2": "Por ejemplo 12",
+    "example3": "Por ejemplo 40",
+    "example4": "Por ejemplo 1",
+    
+    "objectSelectTitle": "Selecciona los objetos para cargar audio",
+    "audioManagerTitle": "Configura el control de inmersión acústica",
+    "objectStatus" : "¡Por favor, selecciona más objetos!",
+    "objectStatusReady" : " objetos seleccionados — ¡listo!",
+    "objectsFound" : "objetos encontrados",
+    
+    "audioConfigTitle": "Configura la configuración de audio para la sesión",
+    "audioConfigDescription": "Puedes configurar el volumen, la distancia mínima y máxima de reproducción, y aplicar filtros de sala.",
+    "tutorialActivityTitle" : "Crea una dirección para la actividad tutorial",
+    "directionStatus" : "Crea y selecciona al menos una dirección para continuar.",
+    "directionStatusReady" : " dirección(es) seleccionada(s) — ¡listo!",
+
+    "configLevel": "Nivel de configuración",
+    "rolloffMode": "Modos Rolloff",
+    "dopplerLevel": "Nivel Doppler",
+    "spread": "Spread (grado)",
+    "spatialBlend": "Spatial blend",
+    "spatialize": "Spatialize",
+
+    "volumeGeneral": "Volumen general",
+    "minConfigLevel": "Nivel de Configuración",
+    "minDistance": "Distancia mínima",
+    "maxDistance": "Distancia máxima",
+    "filterRoom": "Activar filtro de sala",
+    "newDirection": "Nueva dirección...",
+
+    "audioEspacialTitle": "Audio Espacial",
+    "audioEspacialSettings": "Configuración Avanzada",
+    "audioEspacialNoFiles": "Ningún archivo seleccionado",
+    "audioEspacialFilesSelected": " archivo(s) seleccionado(s)",
+    "audioEspacialBrowse": "Examinar",
+    "audioEspacialSave": "Guardar configuración de audio",
+    "audioConfigDescription2": "Puedes configurar el volumen, la distancia minima y maxima de cualquier entorno registrado.",
+    "audioLoadedDescription": "Sube los archivos de audio para continuar con la configuración del nivel de inmersión."
 }

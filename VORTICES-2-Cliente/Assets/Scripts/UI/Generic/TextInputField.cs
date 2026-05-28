@@ -21,8 +21,19 @@ namespace Vortices
             GameObject keyboard = GameObject.Find("Keyboard Canvas");
             if (keyboard != null)
             {
-                inputfield.onSelect.AddListener(delegate { keyboard.GetComponent<HandKeyboard>().SetInputField(inputfield); });
+                HandKeyboard handKeyboard = keyboard.GetComponent<HandKeyboard>();
+                inputfield.onSelect.AddListener(delegate
+                {
+                    if (handKeyboard != null)
+                        handKeyboard.SetInputField(inputfield);
+                });
             }
+        }
+
+        private void OnDestroy()
+        {
+            if (inputfield != null)
+                inputfield.onSelect.RemoveAllListeners();
         }
 
         public string GetData()
