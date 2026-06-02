@@ -235,11 +235,13 @@ namespace Vortices
             label.roomIndex = roomIndex;
             label.Setup(displayLabel, instance.transform, placement.labelInFront, placement.labelHeightOffset);
 
-            // Delegar audio estático al inyector (solo si el tipo de objeto fue seleccionado)
-            bool isExplicitlySelected = SessionManager.instance != null
-                && SessionManager.instance.selectedObjectTypes != null
-                && SessionManager.instance.selectedObjectTypes.Count > 0
-                && SessionManager.instance.selectedObjectTypes.Contains(placement.prefab.name);
+            // Marcar si este objeto debe recibir audio de usuario.
+            // Lista vacía = todos los tipos elegibles (flujo Launcher sin selección explícita).
+            // Lista con entradas = solo esos tipos (flujo VR SalaPanel Step 3).
+            bool isExplicitlySelected = SessionManager.instance == null
+                || SessionManager.instance.selectedObjectTypes == null
+                || SessionManager.instance.selectedObjectTypes.Count == 0
+                || SessionManager.instance.selectedObjectTypes.Contains(placement.prefab.name);
 
             if (audioInjector != null)
             {

@@ -4269,7 +4269,7 @@ MonoBehaviour:
   movePlayerToStartOnGenerate: 1
   playerStartLocalPosition: {x: 0, y: 0, z: 3}
   playerStartLocalEulerAngles: {x: 0, y: 180, z: 0}
-  corridorWidth: 4
+  corridorWidth: 6
   corridorHeight: 6
   corridorSegmentLength: 8
   wallThickness: 0.2

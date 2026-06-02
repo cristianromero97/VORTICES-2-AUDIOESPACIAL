@@ -60,6 +60,14 @@ namespace Vortices
                     Debug.LogWarning("[LauncherBridge] targetEnvironment=Sala pero sessionName vacío — flujo normal.");
                     yield break;
                 }
+
+                // Ocultar todo el Main Menu inmediatamente (UI + cámara)
+                // para que el usuario vea pantalla negra mientras se prepara la transición.
+                foreach (Canvas c in FindObjectsOfType<Canvas>())
+                    c.enabled = false;
+                foreach (Camera cam in FindObjectsOfType<Camera>())
+                    cam.enabled = false;
+
                 ApplySalaConfig(sm, config);
             }
             else
@@ -78,10 +86,55 @@ namespace Vortices
             sm.displayMode     = "Sala";
             sm.isOnlineSession = false;
 
+            // SceneTransitionManager necesita que AddonsController.currentEnvironmentObject
+            // esté seteado — sin esto la escena no carga (sceneName queda vacío).
+            AddonsController addons = AddonsController.instance;
+            if (addons != null)
+            {
+                int count = addons.environmentObjects != null ? addons.environmentObjects.Count : -1;
+                Debug.Log($"[LauncherBridge] environmentObjects.Count = {count}");
+
+                bool found = false;
+                if (addons.environmentObjects != null)
+                {
+                    foreach (EnvironmentObject envObj in addons.environmentObjects)
+                    {
+                        string name = envObj != null ? envObj.environmentName : "(null)";
+                        Debug.Log($"[LauncherBridge] EnvironmentObject encontrado: '{name}'");
+                        if (envObj != null && envObj.environmentName == "Sala Environment")
+                        {
+                            addons.currentEnvironmentObject = envObj;
+                            found = true;
+                            Debug.Log("[LauncherBridge] currentEnvironmentObject seteado a 'Sala Environment'.");
+                            break;
+                        }
+                    }
+                }
+                if (!found)
+                {
+                    // Sala Environment está compilada en el build (Build Settings) pero no fue
+                    // registrada en environmentObjects. La creamos como built-in aquí.
+                    EnvironmentObject salaEnv = new EnvironmentObject();
+                    salaEnv.environmentName = "Sala Environment";
+                    salaEnv.isBuiltIn       = true;
+                    addons.currentEnvironmentObject = salaEnv;
+                    Debug.Log("[LauncherBridge] EnvironmentObject built-in creado para 'Sala Environment'.");
+                }
+            }
+            else
+            {
+                Debug.LogWarning("[LauncherBridge] AddonsController.instance es null.");
+            }
+
             sm.minRooms = Mathf.Max(1, config.minRooms);
             sm.maxRooms = Mathf.Max(sm.minRooms, config.maxRooms);
 
             sm.elementPaths = config.audioPaths != null
+                ? new List<string>(config.audioPaths)
+                : new List<string>();
+
+            // audioPaths es lo que usa AssignUserAudioCoroutine para cargar los clips
+            sm.audioPaths = config.audioPaths != null
                 ? new List<string>(config.audioPaths)
                 : new List<string>();
 

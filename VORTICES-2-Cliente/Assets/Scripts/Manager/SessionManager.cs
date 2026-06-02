@@ -742,6 +742,20 @@ namespace Vortices
             foreach (AudioTargetMarker m in allMarkers)
                 if (m != null && m.gameObject != null) markers.Add(m);
 
+            // Filtrar por tipo de objeto si el examinador eligió tipos específicos en el Step 3
+            // (selectedObjectTypes vacío = todos los tipos son elegibles)
+            if (selectedObjectTypes != null && selectedObjectTypes.Count > 0)
+            {
+                List<AudioTargetMarker> filtered = new List<AudioTargetMarker>();
+                foreach (AudioTargetMarker m in markers)
+                    if (selectedObjectTypes.Contains(m.prefabType)) filtered.Add(m);
+
+                if (filtered.Count > 0)
+                    markers = filtered;
+                else
+                    Debug.LogWarning($"[SessionManager] AssignUserAudio: ningún marker coincide con los tipos seleccionados {string.Join(", ", selectedObjectTypes)} — usando todos.");
+            }
+
             if (AudioManager.Instance == null)
                 Debug.LogWarning("[SessionManager] AssignUserAudio: AudioManager.Instance es null — se usará fallback (Custom rolloff, sin perfil acústico).");
 
