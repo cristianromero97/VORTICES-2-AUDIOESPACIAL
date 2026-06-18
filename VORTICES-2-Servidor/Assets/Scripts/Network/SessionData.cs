@@ -13,5 +13,24 @@ public struct SessionData
     public bool volumetric; // Opcional
     public Vector3Int dimension; // X, Y, Z
     public List<string> elementPaths; // Rutas o URLs
-    public List<string> categories; // Categor�as seleccionadas
+    public List<string> audioPaths;  // URLs o rutas de audio (online usa http://)
+    public List<string> categories; // Categorías seleccionadas
+    // Sala Environment
+    public int minRooms; // N de salas (determina layout; RoomGeometry es determinista)
+    public int maxRooms;
+    // Audio
+    public int configLevel; // Nivel de configuracion HRTF (se propaga a todos los participantes)
+    // Perfil acústico override (aplanado — el servidor no tiene AudioManager)
+    public bool  hasAcousticOverride;
+    public float acousticSpatialBlend;
+    public float acousticSpread;
+    public float acousticDopplerLevel;
+    public int   acousticRolloffMode;   // int (igual que ProfileOverrideData.rolloffMode)
+    public bool  acousticSpatialize;
+    // Emitter override
+    public bool  hasEmitterOverride;
+    public float emitterBaseVolume;
+    public int   emitterMinConfigLevel;
+    public float emitterMinDistance;
+    public float emitterMaxDistance;
 }

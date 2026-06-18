@@ -72,12 +72,12 @@ namespace Vortices
         {
             if (msg.success)
             {
-                Debug.Log($"Sesión creada con éxito: {msg.sessionName}");
-                // Aquí puedes continuar con el flujo del cliente después de recibir la confirmación
+                Debug.Log($"Sesiï¿½n creada con ï¿½xito: {msg.sessionName}");
+                // Aquï¿½ puedes continuar con el flujo del cliente despuï¿½s de recibir la confirmaciï¿½n
             }
             else
             {
-                Debug.LogError("Error al crear la sesión en el servidor.");
+                Debug.LogError("Error al crear la sesiï¿½n en el servidor.");
             }
         }
 
@@ -199,21 +199,18 @@ namespace Vortices
             // Switch to environment scene
             actualTransitionManager = GameObject.Find("TransitionManager").GetComponent<SceneTransitionManager>();
             actualTransitionManager.returnToMain = false;
-            if (isOnlineSession)
-            {
-                NetworkManager.singleton.ServerChangeScene("Museum Environment");
-                yield return StartCoroutine(actualTransitionManager.GoToSceneRoutine());
-            }
-            else
-            {
-                yield return StartCoroutine(actualTransitionManager.GoToSceneRoutine());
-            }
+            // Cargar la escena de ambiente (servidor y cliente lo hacen de forma independiente;
+            // ServerChangeScene NO se usa porque forzarÃ­a el cambio de escena en todos los
+            // clientes conectados, lo que interfiere con las transiciones propias de cada cliente).
+            yield return StartCoroutine(actualTransitionManager.GoToSceneRoutine());
 
             yield return new WaitForSeconds(initializeTime);
 
-            // Verificar si la sesión es online y, si es así, iniciar el host
-            if (isOnlineSession)
+            // El servidor ya pudo haber arrancado en Start() (auto-inicio).
+            // Solo llamar StartHost() si todavÃ­a no hay un servidor activo.
+            if (isOnlineSession && !NetworkServer.active)
             {
+                Debug.Log("[SessionManager] Iniciando servidor Mirror desde LaunchSession...");
                 NetworkManager.singleton.StartHost();
             }
 

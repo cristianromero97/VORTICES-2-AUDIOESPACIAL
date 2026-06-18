@@ -18,6 +18,15 @@ public class CustomNetworkManager : NetworkManager
     {
         base.Start();
         Debug.Log("CustomNetworkManager - Start");
+
+        // Auto-iniciar el servidor para que acepte conexiones desde el menú principal.
+        // Así el Launcher puede lanzar el cliente sin que el usuario del servidor
+        // tenga que crear una sesión manualmente primero.
+        if (!NetworkServer.active && !NetworkClient.isConnected)
+        {
+            Debug.Log("[CustomNetworkManager] Auto-iniciando servidor Mirror...");
+            StartServer();
+        }
     }
 
     public override void OnStartServer()

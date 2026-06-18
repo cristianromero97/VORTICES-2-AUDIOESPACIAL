@@ -73,14 +73,27 @@ public class ServerSessionManager : NetworkBehaviour
         // Registrar handlers
         NetworkServer.RegisterHandler<CreateSessionMessage>(HandleCreateSessionMessage);
         NetworkServer.RegisterHandler<RequestActiveSessionMessage>(HandleRequestActiveSessionMessage);
+        NetworkServer.RegisterHandler<SonidosSyncMessage>(HandleSonidosSync);
 
     }
 
+
+    #region Sincronización SonidosPanel
+
+    private void HandleSonidosSync(NetworkConnectionToClient conn, SonidosSyncMessage msg)
+    {
+        // Retransmitir a TODOS los clientes (incluido el emisor) → reproducción sincronizada
+        NetworkServer.SendToAll(msg);
+        Debug.Log($"[Servidor] SonidosSync retransmitido: audioIndex={msg.audioIndex}");
+    }
+
+    #endregion
 
     #region Manejo de Sesiones
 
     private void HandleCreateSessionMessage(NetworkConnectionToClient conn, CreateSessionMessage msg)
     {
+        Debug.Log($"[Servidor] HandleCreateSessionMessage RECIBIDO — session='{msg.sessionName}', env='{msg.environmentName}', connId={conn.connectionId}");
 
         if (activeSessions.ContainsKey(msg.sessionName))
         {
@@ -100,11 +113,14 @@ public class ServerSessionManager : NetworkBehaviour
         {
             msg.environmentName = "Circular Environment";
         }
+        else if (msg.environmentName == "Sala")
+        {
+            msg.environmentName = "Sala Environment";
+        }
         else
         {
             Debug.LogError($"Nombre de escena desconocido: {msg.environmentName}");
             Debug.Log("[Server] Enviando mensaje: SessionCreatedMessage");
-
 
             conn.Send(new SessionCreatedMessage { success = false });
             return;
@@ -121,7 +137,22 @@ public class ServerSessionManager : NetworkBehaviour
             volumetric = msg.volumetric,
             dimension = msg.dimension,
             categories = msg.categories ?? new List<string>(),
-            elementPaths = msg.elementPaths ?? new List<string>()
+            elementPaths = msg.elementPaths ?? new List<string>(),
+            audioPaths = msg.audioPaths ?? new List<string>(),
+            minRooms = msg.minRooms,
+            maxRooms = msg.maxRooms,
+            configLevel = msg.configLevel,
+            hasAcousticOverride   = msg.hasAcousticOverride,
+            acousticSpatialBlend  = msg.acousticSpatialBlend,
+            acousticSpread        = msg.acousticSpread,
+            acousticDopplerLevel  = msg.acousticDopplerLevel,
+            acousticRolloffMode   = msg.acousticRolloffMode,
+            acousticSpatialize    = msg.acousticSpatialize,
+            hasEmitterOverride    = msg.hasEmitterOverride,
+            emitterBaseVolume     = msg.emitterBaseVolume,
+            emitterMinConfigLevel = msg.emitterMinConfigLevel,
+            emitterMinDistance    = msg.emitterMinDistance,
+            emitterMaxDistance    = msg.emitterMaxDistance
         };
         activeSessions[msg.sessionName] = sessionData;
 
@@ -137,7 +168,22 @@ public class ServerSessionManager : NetworkBehaviour
             volumetric = sessionData.volumetric,
             dimension = sessionData.dimension,
             categories = sessionData.categories,
-            elementPaths = sessionData.elementPaths
+            elementPaths = sessionData.elementPaths,
+            audioPaths = sessionData.audioPaths,
+            minRooms = sessionData.minRooms,
+            maxRooms = sessionData.maxRooms,
+            configLevel = sessionData.configLevel,
+            hasAcousticOverride   = sessionData.hasAcousticOverride,
+            acousticSpatialBlend  = sessionData.acousticSpatialBlend,
+            acousticSpread        = sessionData.acousticSpread,
+            acousticDopplerLevel  = sessionData.acousticDopplerLevel,
+            acousticRolloffMode   = sessionData.acousticRolloffMode,
+            acousticSpatialize    = sessionData.acousticSpatialize,
+            hasEmitterOverride    = sessionData.hasEmitterOverride,
+            emitterBaseVolume     = sessionData.emitterBaseVolume,
+            emitterMinConfigLevel = sessionData.emitterMinConfigLevel,
+            emitterMinDistance    = sessionData.emitterMinDistance,
+            emitterMaxDistance    = sessionData.emitterMaxDistance
         });
 
         Debug.Log("[Servidor] Inicializando NetworkHandler...");
@@ -155,6 +201,11 @@ public class ServerSessionManager : NetworkBehaviour
             GameObject circularNetwork = Instantiate(CircularNetworkPrefab);
             NetworkServer.Spawn(circularNetwork);
             Debug.Log($"[Servidor] CircularNetworkHandler spawneado con Net ID: {circularNetwork.GetComponent<NetworkIdentity>().netId}");
+        }
+        else if (msg.environmentName == "Sala Environment")
+        {
+            // Sala no requiere un NetworkHandler de layout (el layout se sincroniza por seed en el cliente)
+            Debug.Log("[Servidor] Sala Environment registrada. Sin NetworkHandler adicional.");
         }
         else
         {
@@ -227,7 +278,10 @@ public class ServerSessionManager : NetworkBehaviour
             volumetric = sessionData.volumetric,
             dimension = sessionData.dimension,
             categories = sessionData.categories,
-            elementPaths = sessionData.elementPaths
+            elementPaths = sessionData.elementPaths,
+            audioPaths = sessionData.audioPaths,
+            minRooms = sessionData.minRooms,
+            maxRooms = sessionData.maxRooms
         });
     }
 

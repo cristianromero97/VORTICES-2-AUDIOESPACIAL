@@ -341,7 +341,7 @@ namespace Vortices
                 isOnlineMode = false;
                 Debug.Log("Modo Online establecido en: " + isOnlineMode);
             }
- 
+
         }
  
         // All Configuration

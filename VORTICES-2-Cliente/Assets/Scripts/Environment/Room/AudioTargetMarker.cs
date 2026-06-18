@@ -18,5 +18,12 @@ namespace Vortices
 
         private void OnEnable()  { All.Add(this); }
         private void OnDisable() { All.Remove(this); }
+
+        private void OnDrawGizmos()
+        {
+            // Esfera azul = sin audio asignado, verde = con audio asignado
+            Gizmos.color = userAudioSource != null ? Color.green : Color.cyan;
+            Gizmos.DrawWireSphere(transform.position, 0.4f);
+        }
     }
 }

@@ -15,8 +15,17 @@ namespace Vortices
     /// </summary>
     public class LauncherBridge : MonoBehaviour
     {
+        // Flag estática: evita que LauncherBridge vuelva a correr cuando
+        // el usuario finaliza la sesión y regresa al Main Menu.
+        // Se resetea solo al reiniciar la aplicación (nuevo lanzamiento desde el Launcher).
+        private static bool hasAutoLaunched = false;
+
         private IEnumerator Start()
         {
+            // Si ya se hizo un auto-launch en esta ejecución, no interferir con
+            // el flujo normal de retorno al Main Menu.
+            if (hasAutoLaunched) yield break;
+
             // Esperar un frame para que SessionManager.Start() termine y asigne su instancia
             yield return null;
 
@@ -61,6 +70,10 @@ namespace Vortices
                     yield break;
                 }
 
+                // Marcar que ya se ejecutó el auto-launch para que al volver
+                // al Main Menu tras finalizar sesión, LauncherBridge no vuelva a correr.
+                hasAutoLaunched = true;
+
                 // Ocultar todo el Main Menu inmediatamente (UI + cámara)
                 // para que el usuario vea pantalla negra mientras se prepara la transición.
                 foreach (Canvas c in FindObjectsOfType<Canvas>())
@@ -82,9 +95,9 @@ namespace Vortices
             sm.sessionName     = config.sessionName;
             sm.userId          = config.userId;
             sm.environmentName = "Sala";
-            sm.browsingMode    = "Local";
+            sm.browsingMode    = config.isOnlineSession ? "Online" : "Local";
             sm.displayMode     = "Sala";
-            sm.isOnlineSession = false;
+            sm.isOnlineSession = config.isOnlineSession;
 
             // SceneTransitionManager necesita que AddonsController.currentEnvironmentObject
             // esté seteado — sin esto la escena no carga (sceneName queda vacío).
@@ -175,7 +188,14 @@ namespace Vortices
                 ? new List<string>(config.audioPaths)
                 : new List<string>();
 
-            Debug.Log($"[LauncherBridge] Audio config inyectada (configLevel={sm.configLevel}, {sm.audioPaths.Count} archivos).");
+            // Online: guardar IP del servidor para que SessionManager la use al conectar
+            if (config.isOnlineSession)
+            {
+                sm.isOnlineSession  = true;
+                sm.launcherServerIp = config.serverIpAddress;
+            }
+
+            Debug.Log($"[LauncherBridge] Audio config inyectada (configLevel={sm.configLevel}, {sm.audioPaths.Count} archivos, online={config.isOnlineSession}).");
         }
     }
 
@@ -216,5 +236,9 @@ namespace Vortices
 
         // Step 6 - direcciones (solo Sala)
         public List<string> selectedDirections = new List<string>();
+
+        // Online
+        public bool   isOnlineSession = false;
+        public string serverIpAddress = "";
     }
 }

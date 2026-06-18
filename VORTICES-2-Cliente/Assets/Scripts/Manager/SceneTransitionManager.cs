@@ -41,6 +41,18 @@ namespace Vortices
 
         public IEnumerator GoToSceneRoutine()
         {
+            // Limpiar EventSystems duplicados antes de cambiar de escena.
+            // SimpleFileBrowser (selector de archivos en Options) deja un EventSystem extra
+            // que convive con el del nuevo ambiente → warning infinito + freeze.
+            var allEventSystems = FindObjectsOfType<UnityEngine.EventSystems.EventSystem>();
+            if (allEventSystems.Length > 1)
+            {
+                Debug.LogWarning($"[SceneTransitionManager] {allEventSystems.Length} EventSystems encontrados. Eliminando duplicados.");
+                // Mantener solo el primero; destruir el resto
+                for (int i = 1; i < allEventSystems.Length; i++)
+                    Destroy(allEventSystems[i].gameObject);
+            }
+
             fadeScreen = GameObject.FindObjectOfType<FadeScreen>();
             fadeScreen.FadeOut();
 
@@ -55,9 +67,16 @@ namespace Vortices
             EnvironmentObject currentEnvironment = AddonsController.instance.currentEnvironmentObject;
             if (!returnToMain)
             {
-                AddonsController.instance.LoadEnvironmentScene();
+                // Usar carga ASYNC del bundle de escena para no bloquear el hilo principal.
+                // La versión síncrona (LoadEnvironmentScene) puede tardar >60 s en hardware lento
+                // y provoca el timeout KCP de Mirror → desconexión del cliente que se une.
+                if (currentEnvironment == null)
+                {
+                    Debug.LogError("[SceneTransitionManager] currentEnvironmentObject es null. No se puede cargar la escena.");
+                    yield break;
+                }
+                yield return StartCoroutine(AddonsController.instance.LoadEnvironmentSceneAsync());
                 sceneName = currentEnvironment.environmentName;
-
             }
             else
             {

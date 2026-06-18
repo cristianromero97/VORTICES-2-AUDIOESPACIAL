@@ -107,25 +107,36 @@ public class MuseumBaseNetworkHandler : NetworkBehaviour
     IEnumerator WaitForMuseumBase()
     {
         Debug.Log("[Cliente] Esperando a que MuseumBase cargue...");
-        
+
+        // — Bucle 1: esperar MuseumBase (timeout 60 s para no correr indefinidamente) —
         MuseumBase localMuseumBase = null;
-        while (localMuseumBase == null)
+        float timeout = 60f;
+        while (localMuseumBase == null && timeout > 0f)
         {
-            yield return null; // Espera un frame antes de volver a buscar
+            timeout -= Time.deltaTime;
+            yield return null;
             localMuseumBase = FindObjectOfType<MuseumBase>();
+        }
+
+        if (localMuseumBase == null)
+        {
+            Debug.LogWarning("[Cliente] MuseumBase no encontrado en 60 s. Abortando sincronización de MuseumBaseNetworkHandler.");
+            yield break;
         }
 
         Debug.Log("[Cliente] MuseumBase encontrado. Sincronización lista.");
 
-        // Ahora buscamos ChatCanvas(Clone) entre los objetos desactivados
+        // — Bucle 2: esperar ChatCanvas(Clone) (timeout 30 s) —
+        // Resources.FindObjectsOfTypeAll es MUY caro; se limita a 30 s máximo.
         Debug.Log("[Cliente] Buscando ChatCanvas(Clone)...");
 
         GameObject chatCanvas = null;
-        while (chatCanvas == null)
+        timeout = 30f;
+        while (chatCanvas == null && timeout > 0f)
         {
-            yield return null; // Espera un frame antes de volver a buscar
+            timeout -= Time.deltaTime;
+            yield return null;
 
-            // Buscar entre objetos desactivados
             GameObject[] allObjects = Resources.FindObjectsOfTypeAll<GameObject>();
             foreach (GameObject obj in allObjects)
             {
@@ -136,6 +147,12 @@ public class MuseumBaseNetworkHandler : NetworkBehaviour
                     break;
                 }
             }
+        }
+
+        if (chatCanvas == null)
+        {
+            Debug.LogWarning("[Cliente] ChatCanvas(Clone) no encontrado en 30 s. Se omite el posicionamiento.");
+            yield break;
         }
 
         // Ajustar posición y rotación cuando lo encuentre

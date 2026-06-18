@@ -30961,6 +30961,7 @@ MonoBehaviour:
   userId: 0
   environmentName: 
   isOnlineSession: 0
+  launcherServerIp: 
   configLevel: 4
   minRooms: 1
   maxRooms: 50

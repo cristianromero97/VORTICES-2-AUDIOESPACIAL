@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
+using Mirror;
 
 namespace Vortices
 {
@@ -67,6 +68,13 @@ namespace Vortices
             instance = this;
             BuildUI();
             SetVisible(false);
+            // Registrar handler de sincronización (se reemplaza si hay instancias previas)
+            NetworkClient.RegisterHandler<SonidosSyncMessage>(OnSonidosSyncReceived);
+        }
+
+        private void OnDestroy()
+        {
+            NetworkClient.UnregisterHandler<SonidosSyncMessage>();
         }
 
         private void Update()
@@ -189,12 +197,42 @@ namespace Vortices
 
         private void OnEmitirClicked(SoundRow row)
         {
-            if (currentSrc == row.src)
-                StopCurrent();
+            // Sesión online: enviar al servidor para que retransmita a todos
+            if (NetworkClient.isConnected &&
+                SessionManager.instance != null && SessionManager.instance.isOnlineSession)
+            {
+                int idx = currentSrc == row.src ? -1 : rows.IndexOf(row);
+                NetworkClient.Send(new SonidosSyncMessage { audioIndex = idx });
+            }
             else
             {
+                // Offline: acción local directa
+                if (currentSrc == row.src)
+                    StopCurrent();
+                else
+                {
+                    StopCurrent();
+                    PlayRow(row);
+                }
+            }
+        }
+
+        /// <summary>Recibe el mensaje retransmitido por el servidor y ejecuta la acción localmente.</summary>
+        private void OnSonidosSyncReceived(SonidosSyncMessage msg)
+        {
+            if (msg.audioIndex < 0)
+            {
                 StopCurrent();
-                PlayRow(row);
+            }
+            else if (msg.audioIndex < rows.Count)
+            {
+                StopCurrent();
+                PlayRow(rows[msg.audioIndex]);
+            }
+            else
+            {
+                Debug.LogWarning($"[SonidosPanel] SonidosSync: índice {msg.audioIndex} fuera de rango " +
+                                 $"(rows.Count={rows.Count}). ¿Panel aún no inicializado?");
             }
         }
 

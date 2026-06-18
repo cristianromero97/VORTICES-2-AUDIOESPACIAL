@@ -25,7 +25,8 @@ namespace Vortices
         public string sessionName;
         public int userId;
         public string environmentName;
-        public bool isOnlineSession = false;
+        public bool   isOnlineSession  = false;
+        public string launcherServerIp = "";   // IP del servidor seteada por el Launcher (online)
         // Sala Environment settings
         public int configLevel = 4;
         public int minRooms    = 1;
@@ -55,6 +56,8 @@ namespace Vortices
         // Session Manager settings
         public float initializeTime = 2.0f;
         private bool sessionDataReceived = false;
+        // Flag: el servidor confirmó la creación de sesión del examinador (success=true)
+        private bool sessionCreatedOnServer = false;
  
  
         // Controllers
@@ -72,6 +75,9 @@ namespace Vortices
  
         // Coroutine
         public bool sessionLaunchRunning;
+        // Referencias a las coroutines del flujo Join (para poder cancelarlas en reintentos)
+        private Coroutine joinConnectionCoroutine;
+        private Coroutine joinSceneLoadCoroutine;
  
         public GameObject currentlySelected;
         public GameObject lastSelected;
@@ -119,9 +125,13 @@ namespace Vortices
         {
             if (!msg.success)
             {
+                Debug.LogWarning("[SessionManager] HandleSessionCreatedMessage: success=false — la sesión ya existe o el nombre de ambiente es desconocido. Cambia el nombre de sesión e intenta de nuevo.");
                 return;
             }
- 
+
+            sessionCreatedOnServer = true;
+            Debug.Log("[SessionManager] HandleSessionCreatedMessage: sesión confirmada por el servidor.");
+
             sessionName = msg.sessionName;
             userId = msg.userId;
  
@@ -147,7 +157,30 @@ namespace Vortices
             volumetric = msg.volumetric;
             dimension = msg.dimension;
             elementPaths = msg.elementPaths;
- 
+            audioPaths = msg.audioPaths ?? new List<string>();
+            minRooms = msg.minRooms > 0 ? msg.minRooms : minRooms;
+            maxRooms = msg.maxRooms > 0 ? msg.maxRooms : maxRooms;
+            if (msg.configLevel > 0) configLevel = msg.configLevel;
+            // Perfil acústico y emitter (el examiner ya los tiene desde AudioSpatialPanel,
+            // pero los actualizamos desde el mensaje por consistencia)
+            if (msg.hasAcousticOverride)
+            {
+                hasAcousticOverride = true;
+                acousticOverride = new AudioManager.ProfileOverrideData
+                {
+                    spatialBlend = msg.acousticSpatialBlend,
+                    spread       = msg.acousticSpread,
+                    dopplerLevel = msg.acousticDopplerLevel,
+                    rolloffMode  = msg.acousticRolloffMode,
+                    spatialize   = msg.acousticSpatialize
+                };
+            }
+            hasEmitterOverride    = msg.hasEmitterOverride;
+            if (msg.emitterBaseVolume > 0)     emitterBaseVolume     = msg.emitterBaseVolume;
+            if (msg.emitterMinConfigLevel > 0) emitterMinConfigLevel = msg.emitterMinConfigLevel;
+            if (msg.emitterMinDistance > 0)    emitterMinDistance    = msg.emitterMinDistance;
+            if (msg.emitterMaxDistance > 0)    emitterMaxDistance    = msg.emitterMaxDistance;
+
             categoryController.UpdateCategoriesList(msg.categories);
         }
  
@@ -156,6 +189,10 @@ namespace Vortices
  
         private void Update()
         {
+            // EventSystem.current puede ser null en escenas cargadas desde bundle
+            // donde el script del EventSystem no coincide con el build actual.
+            if (EventSystem.current == null) return;
+
             if (EventSystem.current.currentSelectedGameObject != null)
             {
                 currentlySelected = EventSystem.current.currentSelectedGameObject;
@@ -173,22 +210,22 @@ namespace Vortices
                 lastSelected = EventSystem.current.currentSelectedGameObject;
             }
         }
- 
+
         private void FindAndSetNextSelectable()
         {
             GameObject canvasObject = GameObject.Find("Canvas"); // Find the GameObject named "Canvas"
- 
+
             if (canvasObject == null)
             {
-                Debug.LogError("No GameObject named 'Canvas' found in the scene.");
+                // En Museum/Sala/Circular no hay un Canvas llamado "Canvas" — evitar spam de errores.
                 return;
             }
- 
+
             Canvas canvasComponent = canvasObject.GetComponent<Canvas>(); // Get the Canvas component from the GameObject
- 
+
             if (canvasComponent == null)
             {
-                Debug.LogError("No Canvas component found on the 'Canvas' GameObject.");
+                // Silenciar: el Canvas puede estar mal en escenas de bundle stale.
                 return;
             }
  
@@ -235,7 +272,9 @@ namespace Vortices
         public IEnumerator LaunchSessionCoroutine(string sessionName, int userId, string environmentName)
         {
             sessionLaunchRunning = true;
- 
+
+            Debug.Log($"[LaunchSessionCoroutine] INICIO — isOnlineSession={isOnlineSession}, env='{environmentName}', NetworkClient.isConnected={NetworkClient.isConnected}");
+
             GameObject keyboard = GameObject.Find("Keyboard Canvas");
             if (keyboard != null)
             {
@@ -253,7 +292,12 @@ namespace Vortices
                 {
                     if (!NetworkClient.isConnected)
                     {
-                        NetworkManager.singleton.networkAddress = "127.0.0.1"; // 134.65.228.226 Oracle
+                        // Usar IP del Launcher si está definida (online LAN), si no localhost
+                        string targetIp = !string.IsNullOrEmpty(launcherServerIp)
+                            ? launcherServerIp
+                            : "127.0.0.1"; // fallback local (modo offline/debug)
+                        NetworkManager.singleton.networkAddress = targetIp;
+                        Debug.Log($"[SessionManager] Conectando a Mirror server en {targetIp}...");
                         NetworkManager.singleton.StartClient();
  
                         float timeout = 10f;
@@ -277,47 +321,140 @@ namespace Vortices
                         userId = userId,
                         environmentName = environmentName,
                         elementPaths = elementPaths,
+                        audioPaths = audioPaths ?? new List<string>(),
                         categories = categoryController.GetCategories(),
-                        browsingMode = "Online"
+                        browsingMode = "Online",
+                        minRooms = minRooms,
+                        maxRooms = maxRooms,
+                        configLevel = configLevel
                     };
  
                     yield return StartCoroutine(SendSessionDataToServer(sessionData));
- 
-                    
-                    if (environmentName == "Circular")
+
+                    // Si el servidor no confirmó la sesión, NO cargar la escena.
+                    // Esto evita que el examinador entre al entorno sin que el servidor tenga la sesión registrada.
+                    if (!sessionCreatedOnServer)
                     {
-                        environmentName = "Circular Environment";
+                        Debug.LogError("[LaunchSessionCoroutine] El servidor no confirmó la sesión. Abortando carga de escena online. " +
+                                       "Posibles causas: (1) nombre de sesión ya existe en el servidor, (2) servidor no accesible, " +
+                                       "(3) nombre de ambiente no reconocido. Reinicia el servidor o usa otro nombre de sesión.");
+                        sessionLaunchRunning = false;
+                        // Hacer FadeIn para que el usuario no quede con pantalla negra
+                        var tsErr = SceneTransitionManager.instance;
+                        if (tsErr?.fadeScreen != null) tsErr.fadeScreen.FadeIn();
+                        yield break;
                     }
-                    else if (environmentName == "Museum")
-                    {
-                        environmentName = "Museum Environment";
-                    }
-                    else if (environmentName == "Sala")
-                    {
-                        environmentName = "Sala Environment";
-                    }
- 
+
+                    // Convertir el nombre del ambiente ANTES de GoToSceneRoutine y capturarlo
+                    // en una variable LOCAL para que HandleSessionCreatedMessage (que puede llegar
+                    // asíncronamente del servidor) no sobreescriba el valor mientras la coroutine sigue.
+                    if (environmentName == "Circular")      environmentName = "Circular Environment";
+                    else if (environmentName == "Museum")   environmentName = "Museum Environment";
+                    else if (environmentName == "Sala")     environmentName = "Sala Environment";
+                    string targetEnvironment = environmentName; // ← variable local inmune a race condition
+
                     yield return StartCoroutine(actualTransitionManager.GoToSceneRoutine());
-            
+
+                    // Un frame para que Start() de los objetos de la escena se ejecute
+                    yield return null;
+
+                    // Limpiar EventSystems duplicados tras cargar el bundle de la escena
+                    var allES = FindObjectsOfType<UnityEngine.EventSystems.EventSystem>();
+                    if (allES.Length > 1)
+                    {
+                        Debug.LogWarning($"[LaunchSessionCoroutine] {allES.Length} EventSystems detectados. Eliminando duplicados.");
+                        for (int i = 1; i < allES.Length; i++)
+                            Destroy(allES[i].gameObject);
+                    }
+
+                    // Sala Environment online — configurar AudioManager y RoomGeometry
+                    // igual que el path offline para que el examiner vea el layout correcto
+                    if (targetEnvironment == "Sala Environment")
+                    {
+                        AudioManager audioManager = GameObject.FindObjectOfType<AudioManager>(true);
+                        if (audioManager != null)
+                        {
+                            audioManager.SetConfigLevel(configLevel);
+                            if (hasAcousticOverride)
+                                audioManager.ApplyProfileOverride(configLevel, acousticOverride);
+                            if (hasRoomFilter)
+                            {
+                                audioManager.SetRoomFilterEnabled(true);
+                                if (roomFilterAll)
+                                    audioManager.EnableAllRooms();
+                                else
+                                    audioManager.SetEnabledRooms(roomFilterIds);
+                            }
+                        }
+                        else
+                            Debug.LogWarning("[SessionManager] AudioManager no encontrado en Sala Environment (online examiner).");
+
+                        RoomGeometry roomGeometry = GameObject.FindObjectOfType<RoomGeometry>(true);
+                        if (roomGeometry != null)
+                        {
+                            roomGeometry.SetRoomConfig(minRooms, maxRooms);
+                            roomGeometry.RegenerateScenario();
+                        }
+                        else
+                            Debug.LogWarning("[SessionManager] RoomGeometry no encontrado en Sala Environment (online examiner).");
+                    }
+
                     yield return new WaitForSeconds(initializeTime);
- 
- 
- 
-                    //  AHORA BUSCAMOS TODOS LOS OBJETOS NECESARIOS 
+
+                    //  AHORA BUSCAMOS TODOS LOS OBJETOS NECESARIOS
                     actualTransitionManager = GameObject.FindObjectOfType<SceneTransitionManager>(true);
                     categoryController = GameObject.FindObjectOfType<CategoryController>(true);
                     elementCategoryController = GameObject.FindObjectOfType<ElementCategoryController>(true);
                     loggingController = GameObject.FindObjectOfType<LoggingController>(true);
                     spawnController = GameObject.FindObjectOfType<SpawnController>(true);
                     righthandTools = GameObject.FindObjectOfType<RighthandTools>(true);
- 
-                    elementCategoryController.Initialize();
-                    loggingController.Initialize();
-                    spawnController.Initialize();
+
+                    // Null-check: Sala Environment no tiene ElementCategoryController/LoggingController/SpawnController
+                    if (elementCategoryController != null) elementCategoryController.Initialize();
+                    else Debug.LogWarning("[SessionManager] elementCategoryController no encontrado (normal en Sala Environment).");
+                    if (loggingController != null) loggingController.Initialize();
+                    else Debug.LogWarning("[SessionManager] loggingController no encontrado (normal en Sala Environment).");
+                    if (spawnController != null) spawnController.Initialize();
+                    else Debug.LogWarning("[SessionManager] spawnController no encontrado (normal en Sala Environment).");
                     inputController.RestartInputs();
- 
+
+                    // Sala online: asignar audio a los markers.
+                    // - Launcher: audioPaths contiene URLs http:// (AudioHttpServer)
+                    // - VR menú:  SalaPanel setea elementPaths (rutas locales), audioPaths queda vacío
+                    //   → usar elementPaths como fallback igual que hace el path offline.
+                    if (targetEnvironment == "Sala Environment")
+                    {
+                        List<string> salaAudio = (audioPaths != null && audioPaths.Count > 0)
+                            ? audioPaths
+                            : elementPaths;
+                        if (salaAudio != null && salaAudio.Count > 0)
+                            yield return StartCoroutine(AssignUserAudioCoroutine(salaAudio));
+                        else
+                            Debug.LogWarning("[SessionManager] Sin rutas de audio para Sala (online). Verifica que hayas cargado archivos.");
+                    }
+
+                    // Museum / Circular online: configurar AudioManager + asignar audio de Options.
+                    // Replica el bloque equivalente del path offline.
+                    else if (targetEnvironment == "Museum Environment" || targetEnvironment == "Circular Environment")
+                    {
+                        AudioManager audioManager = GameObject.FindObjectOfType<AudioManager>(true);
+                        if (audioManager != null)
+                        {
+                            audioManager.SetConfigLevel(configLevel);
+                            if (hasAcousticOverride)
+                                audioManager.ApplyProfileOverride(configLevel, acousticOverride);
+                        }
+                        else
+                            Debug.LogWarning($"[SessionManager] AudioManager no encontrado en {targetEnvironment} (online).");
+
+                        if (audioPaths != null && audioPaths.Count > 0)
+                            yield return StartCoroutine(AssignUserAudioCoroutine(audioPaths));
+                        else
+                            Debug.LogWarning($"[SessionManager] audioPaths vacío en {targetEnvironment} (online). Carga audios desde Options.");
+                    }
+
                     sessionLaunchRunning = false;
- 
+
                     StartCoroutine(ConnectToVoiceChatCoroutine(userId));
                     Debug.Log("Se envió la data al servidor.");
                     yield break;
@@ -417,11 +554,12 @@ namespace Vortices
         {
             if (!NetworkClient.isConnected)
             {
-                Debug.LogError("El cliente no est� conectado al servidor. No se puede enviar la sesi�n.");
+                Debug.LogError("[SessionManager] SendSessionDataToServer: cliente NO conectado al servidor. Verifica que el servidor esté corriendo y la IP sea correcta.");
                 yield break;
             }
- 
-            Debug.Log("Enviando datos de sesi�n al servidor...");
+
+            sessionCreatedOnServer = false; // reset antes de enviar
+            Debug.Log($"[SessionManager] SendSessionDataToServer: enviando CreateSessionMessage (session='{sessionName}', env='{environmentName}', isOnline={isOnlineSession})...");
             NetworkClient.Send(new CreateSessionMessage
             {
                 sessionName = sessionName,
@@ -429,14 +567,40 @@ namespace Vortices
                 environmentName = environmentName,
                 isOnlineSession = isOnlineSession,
                 displayMode = displayMode,
-                browsingMode = browsingMode,
+                browsingMode = "Online",   // siempre "Online" en el path online — SalaPanel setea "Local" pero eso es solo para el modo offline
                 volumetric = volumetric,
                 dimension = dimension,
                 categories = categoryController.GetCategories(),
-                elementPaths = elementPaths
+                elementPaths = elementPaths,
+                audioPaths = audioPaths ?? new List<string>(),
+                minRooms = minRooms,
+                maxRooms = maxRooms,
+                configLevel           = configLevel,
+                hasAcousticOverride   = hasAcousticOverride,
+                acousticSpatialBlend  = acousticOverride.spatialBlend,
+                acousticSpread        = acousticOverride.spread,
+                acousticDopplerLevel  = acousticOverride.dopplerLevel,
+                acousticRolloffMode   = acousticOverride.rolloffMode,
+                acousticSpatialize    = acousticOverride.spatialize,
+                hasEmitterOverride    = hasEmitterOverride,
+                emitterBaseVolume     = emitterBaseVolume,
+                emitterMinConfigLevel = emitterMinConfigLevel,
+                emitterMinDistance    = emitterMinDistance,
+                emitterMaxDistance    = emitterMaxDistance
             });
- 
-            yield return new WaitForSeconds(1.0f);
+
+            // Esperar hasta 5 s a que el servidor confirme la sesión (HandleSessionCreatedMessage pone sessionCreatedOnServer = true)
+            float waitConfirm = 5f;
+            while (!sessionCreatedOnServer && waitConfirm > 0f)
+            {
+                waitConfirm -= Time.deltaTime;
+                yield return null;
+            }
+
+            if (!sessionCreatedOnServer)
+                Debug.LogError("[SessionManager] SendSessionDataToServer: el servidor NO confirmó la sesión en 5 s. Puede que el nombre ya exista, la conexión se perdió, o el servidor no reconoció el mensaje.");
+            else
+                Debug.Log("[SessionManager] SendSessionDataToServer: servidor confirmó la sesión.");
         }
  
         public IEnumerator StopSessionCoroutine()
@@ -537,7 +701,9 @@ namespace Vortices
             categoryController.UpdateCategoriesList(null);
             isOnlineSession = false;
             browsingMode = string.Empty;
- 
+            sessionDataReceived = false;      // Reset para que JoinSession pueda volver a esperar datos frescos
+            sessionCreatedOnServer = false;   // Reset para que LaunchSession pueda volver a esperar confirmación del servidor
+
             // Reiniciar controladores auxiliares si es necesario
             categoryController?.Initialize();
             elementCategoryController?.Initialize();
@@ -550,13 +716,29 @@ namespace Vortices
         {
             if (!string.IsNullOrEmpty(ipAddress))
             {
-                NetworkManager.singleton.networkAddress = ipAddress;
-                NetworkManager.singleton.StartClient();
-                StartCoroutine(WaitForConnectionAndJoinSession()); 
- 
-                isOnlineSession = true;
- 
-                StartCoroutine(WaitForSessionDataAndLoadScene());
+                // Cancelar coroutines de un intento previo que todavía estén corriendo
+                if (joinConnectionCoroutine != null) { StopCoroutine(joinConnectionCoroutine); joinConnectionCoroutine = null; }
+                if (joinSceneLoadCoroutine  != null) { StopCoroutine(joinSceneLoadCoroutine);  joinSceneLoadCoroutine  = null; }
+
+                // Resetear flag para que WaitForSessionDataAndLoadScene espere datos frescos
+                sessionDataReceived = false;
+                isOnlineSession     = true;
+
+                // Si el cliente Mirror ya está activo (reintento sin reiniciar la app) no relanzarlo.
+                // "Client already started" silencia la solicitud y deja la conexión previa activa.
+                if (!NetworkClient.active)
+                {
+                    NetworkManager.singleton.networkAddress = ipAddress;
+                    NetworkManager.singleton.StartClient();
+                    Debug.Log($"[SessionManager] JoinSession: StartClient en {ipAddress}");
+                }
+                else
+                {
+                    Debug.Log("[SessionManager] JoinSession: cliente Mirror ya activo — reutilizando conexión existente.");
+                }
+
+                joinConnectionCoroutine = StartCoroutine(WaitForConnectionAndJoinSession());
+                joinSceneLoadCoroutine  = StartCoroutine(WaitForSessionDataAndLoadScene());
             }
             else
             {
@@ -568,52 +750,189 @@ namespace Vortices
         private IEnumerator JoinSessionRoutine()
         {
             Debug.Log("[DEBUG] Iniciando carga de escena para sesión online...");
-        
+
+            // Asegurar que actualTransitionManager esté disponible antes de usarlo
+            // (JoinSession no pasa por LaunchSessionCoroutine, hay que buscarlo aquí)
+            if (actualTransitionManager == null)
+                actualTransitionManager = GameObject.Find("TransitionManager")?.GetComponent<SceneTransitionManager>();
+
+            if (actualTransitionManager == null)
+            {
+                Debug.LogError("[SessionManager] TransitionManager no encontrado en JoinSessionRoutine. Abortando.");
+                yield break;
+            }
+
+            // HandleActiveSessionResponse setea environmentName en forma corta ("Sala", "Museum", "Circular").
+            // Normalizar a nombre completo para que los checks de abajo funcionen.
+            if (environmentName == "Sala")           environmentName = "Sala Environment";
+            else if (environmentName == "Museum")    environmentName = "Museum Environment";
+            else if (environmentName == "Circular")  environmentName = "Circular Environment";
+
             // Cambiar a la escena correspondiente
             yield return StartCoroutine(actualTransitionManager.GoToSceneRoutine());
- 
+
+            // Un frame para que Start() de los objetos de la escena se ejecute
+            yield return null;
+
+            // La escena del bundle puede traer su propio EventSystem → quedan 2 → input se congela.
+            // Eliminar duplicados ahora que la escena ya cargó.
+            var allEventSystems = FindObjectsOfType<UnityEngine.EventSystems.EventSystem>();
+            if (allEventSystems.Length > 1)
+            {
+                Debug.LogWarning($"[JoinSessionRoutine] {allEventSystems.Length} EventSystems detectados tras cargar escena. Eliminando duplicados.");
+                for (int i = 1; i < allEventSystems.Length; i++)
+                    Destroy(allEventSystems[i].gameObject);
+            }
+
+            // Revelar la escena: si el FadeScreen es hijo del SceneTransitionManager (DontDestroyOnLoad)
+            // persiste entre escenas y quedó negro tras GoToSceneRoutine→FadeOut. Llamar FadeIn aquí.
+            // Si fue destruido al cambiar de escena, el FadeScreen de la nueva escena ya llamó FadeIn
+            // desde su propio Start() — en ese caso fadeScreen es null y no hacemos nada.
+            {
+                var ts = SceneTransitionManager.instance;
+                if (ts != null && ts.fadeScreen != null)
+                {
+                    Debug.Log("[JoinSessionRoutine] FadeScreen persistente detectado → llamando FadeIn para revelar la escena.");
+                    ts.fadeScreen.FadeIn();
+                }
+            }
+
+            // Señalizar a Mirror que el cliente está listo en la nueva escena.
+            // LoadSceneMode.Single destruye los objetos spawneados localmente; Ready() hace que el servidor
+            // reenvíe los SpawnMessages para que el cliente los recree en la nueva escena.
+            // IMPORTANTE: si el bundle de escena tardó >60 s en cargarse, la conexión KCP puede haberse
+            // cortado por timeout. En ese caso isConnected es false y el player prefab nunca se re-spawneará
+            // → sin cámara → pantalla negra. La solución principal es la carga ASYNC del bundle (async fix
+            // en GoToSceneRoutine). Este bloque loguea el estado para facilitar diagnóstico.
+            if (NetworkClient.isConnected)
+            {
+                Debug.Log("[JoinSessionRoutine] Llamando NetworkClient.Ready() para resincronizar objetos Mirror.");
+                NetworkClient.Ready();
+            }
+            else
+            {
+                Debug.LogError("[JoinSessionRoutine] La conexión Mirror se perdió durante la carga de escena (probable timeout KCP). " +
+                               "El player prefab no será spawneado → la escena puede verse en negro. " +
+                               "Revisa que la carga del bundle de escena sea async y que el tiempo total sea <60 s.");
+                // Revelar la escena de todas formas (puede estar negra pero al menos el usuario ve algo)
+                var ts2 = SceneTransitionManager.instance;
+                if (ts2?.fadeScreen != null) ts2.fadeScreen.FadeIn();
+                sessionLaunchRunning = false;
+                yield break;
+            }
+
+            // Sala Environment — el joining client genera el mismo layout que el examiner
+            // (RoomGeometry es determinista; mismo minRooms = mismo layout)
+            if (environmentName == "Sala Environment")
+            {
+                AudioManager audioManager = GameObject.FindObjectOfType<AudioManager>(true);
+                if (audioManager != null)
+                {
+                    audioManager.SetConfigLevel(configLevel);
+                    if (hasAcousticOverride)
+                        audioManager.ApplyProfileOverride(configLevel, acousticOverride);
+                }
+                else
+                    Debug.LogWarning("[SessionManager] AudioManager no encontrado en Sala Environment (joining client).");
+
+                RoomGeometry roomGeometry = GameObject.FindObjectOfType<RoomGeometry>(true);
+                if (roomGeometry != null)
+                {
+                    roomGeometry.SetRoomConfig(minRooms, maxRooms);
+                    roomGeometry.RegenerateScenario();
+                    Debug.Log($"[SessionManager] Layout Sala generado para joining client: {minRooms} salas.");
+                }
+                else
+                    Debug.LogWarning("[SessionManager] RoomGeometry no encontrado en Sala Environment (joining client).");
+            }
+
             Debug.Log("[DEBUG] Esperando tiempo de inicialización...");
             yield return new WaitForSeconds(initializeTime);
- 
-            //  AHORA BUSCAMOS TODOS LOS OBJETOS NECESARIOS 
+
+            //  AHORA BUSCAMOS TODOS LOS OBJETOS NECESARIOS
             Debug.Log("[DEBUG] Buscando y configurando controladores en la escena...");
- 
+
             actualTransitionManager = GameObject.FindObjectOfType<SceneTransitionManager>(true);
             categoryController = GameObject.FindObjectOfType<CategoryController>(true);
             elementCategoryController = GameObject.FindObjectOfType<ElementCategoryController>(true);
             loggingController = GameObject.FindObjectOfType<LoggingController>(true);
             spawnController = GameObject.FindObjectOfType<SpawnController>(true);
             righthandTools = GameObject.FindObjectOfType<RighthandTools>(true);
- 
-            elementCategoryController.Initialize();
-            loggingController.Initialize();
-            spawnController.Initialize();
+
+            // Null-check: Sala Environment no tiene ElementCategoryController/LoggingController/SpawnController
+            if (elementCategoryController != null) elementCategoryController.Initialize();
+            else Debug.LogWarning("[SessionManager] elementCategoryController no encontrado (normal en Sala Environment).");
+            if (loggingController != null) loggingController.Initialize();
+            else Debug.LogWarning("[SessionManager] loggingController no encontrado (normal en Sala Environment).");
+            if (spawnController != null) spawnController.Initialize();
+            else Debug.LogWarning("[SessionManager] spawnController no encontrado (normal en Sala Environment).");
             inputController.RestartInputs();
- 
+
+            // Sala online: asignar audio a los markers (audioPaths contiene URLs http:// del examiner)
+            if (environmentName == "Sala Environment" && audioPaths != null && audioPaths.Count > 0)
+                yield return StartCoroutine(AssignUserAudioCoroutine(audioPaths));
+
+            // Museum / Circular online: el joining client también debe escuchar el audio espacial.
+            // audioPaths fue recibido del servidor via HandleActiveSessionResponse (mismo valor que el examiner).
+            else if ((environmentName == "Museum Environment" || environmentName == "Circular Environment")
+                     && audioPaths != null && audioPaths.Count > 0)
+            {
+                AudioManager audioManager = GameObject.FindObjectOfType<AudioManager>(true);
+                if (audioManager != null)
+                {
+                    audioManager.SetConfigLevel(configLevel);
+                    if (hasAcousticOverride)
+                        audioManager.ApplyProfileOverride(configLevel, acousticOverride);
+                }
+                else
+                    Debug.LogWarning($"[SessionManager] AudioManager no encontrado en {environmentName} (joining client).");
+
+                yield return StartCoroutine(AssignUserAudioCoroutine(audioPaths));
+            }
+            else if (audioPaths == null || audioPaths.Count == 0)
+                Debug.LogWarning($"[SessionManager] audioPaths vacío para joining client en {environmentName}. No se asigna audio.");
+
             sessionLaunchRunning = false;
- 
+
             // Conectar al canal de voz
             Debug.Log("[DEBUG] Conectando al canal de voz...");
             StartCoroutine(ConnectToVoiceChatCoroutine(userId));
         }
- 
- 
+
+
         private IEnumerator WaitForConnectionAndJoinSession()
         {
-            float timeout = 10f;
-            float elapsedTime = 0f;
- 
-            while (!NetworkClient.isConnected && elapsedTime < timeout)
+            // Esperar conexión (hasta 10 s)
+            float connTimeout = 10f;
+            float elapsed = 0f;
+            while (!NetworkClient.isConnected && elapsed < connTimeout)
             {
-                elapsedTime += Time.deltaTime;
+                elapsed += Time.deltaTime;
                 yield return null;
             }
- 
-            if (NetworkClient.isConnected)
+
+            if (!NetworkClient.isConnected)
             {
-                NetworkClient.Send(new RequestActiveSessionMessage());
+                Debug.LogError("[SessionManager] WaitForConnectionAndJoinSession: no se pudo conectar al servidor en 10 s.");
+                yield break;
             }
- 
+
+            // Reintentar RequestActiveSessionMessage cada 2 s.
+            // Máximo 30 reintentos × 2 s = 60 s (igual al timeout de WaitForSessionDataAndLoadScene).
+            int maxRetries = 30;
+            int retryCount = 0;
+            while (!sessionDataReceived && NetworkClient.isConnected && retryCount < maxRetries)
+            {
+                Debug.Log($"[SessionManager] RequestActiveSessionMessage — intento {retryCount + 1}/{maxRetries}...");
+                NetworkClient.Send(new RequestActiveSessionMessage());
+                retryCount++;
+                yield return new WaitForSeconds(2f);
+            }
+
+            if (!sessionDataReceived)
+                Debug.LogWarning("[SessionManager] WaitForConnectionAndJoinSession: agotados los reintentos sin recibir datos de sesión.");
+
+            joinConnectionCoroutine = null;
         }
  
         private void HandleActiveSessionResponse(ActiveSessionResponseMessage msg)
@@ -630,7 +949,12 @@ namespace Vortices
  
             if (msg.sessionData.elementPaths == null)
             {
-                msg.sessionData.elementPaths = new List<string>(); 
+                msg.sessionData.elementPaths = new List<string>();
+            }
+
+            if (msg.sessionData.audioPaths == null)
+            {
+                msg.sessionData.audioPaths = new List<string>();
             }
  
             sessionName = msg.sessionData.sessionName;
@@ -661,22 +985,90 @@ namespace Vortices
             {
                 Debug.Log($"  - {path}");
             }
-            categoryController.Initialize();
+            // Null-check: el joining client puede no tener categoryController asignado aún.
+            // Sin él la excepción era silenciosa y sessionDataReceived nunca se seteaba → pantalla negra.
+            if (categoryController != null)
+                categoryController.Initialize();
+            else
+                Debug.LogWarning("[SessionManager] HandleActiveSessionResponse: categoryController es null, se omite Initialize().");
             //  Asignamos los `elementPaths` al SessionManager
             elementPaths = new List<string>(msg.sessionData.elementPaths);
- 
+            //  Asignamos los `audioPaths` (pueden ser URLs http:// en modo online)
+            audioPaths = new List<string>(msg.sessionData.audioPaths);
+            //  Sala: sincronizar layout (RoomGeometry es determinista con el mismo minRooms)
+            if (msg.sessionData.minRooms > 0) minRooms = msg.sessionData.minRooms;
+            if (msg.sessionData.maxRooms > 0) maxRooms = msg.sessionData.maxRooms;
+            //  Audio: sincronizar toda la configuración del examinador
+            if (msg.sessionData.configLevel > 0) configLevel = msg.sessionData.configLevel;
+            if (msg.sessionData.hasAcousticOverride)
+            {
+                hasAcousticOverride = true;
+                acousticOverride = new AudioManager.ProfileOverrideData
+                {
+                    spatialBlend = msg.sessionData.acousticSpatialBlend,
+                    spread       = msg.sessionData.acousticSpread,
+                    dopplerLevel = msg.sessionData.acousticDopplerLevel,
+                    rolloffMode  = msg.sessionData.acousticRolloffMode,
+                    spatialize   = msg.sessionData.acousticSpatialize
+                };
+            }
+            hasEmitterOverride    = msg.sessionData.hasEmitterOverride;
+            if (msg.sessionData.emitterBaseVolume > 0)     emitterBaseVolume     = msg.sessionData.emitterBaseVolume;
+            if (msg.sessionData.emitterMinConfigLevel > 0) emitterMinConfigLevel = msg.sessionData.emitterMinConfigLevel;
+            if (msg.sessionData.emitterMinDistance > 0)    emitterMinDistance    = msg.sessionData.emitterMinDistance;
+            if (msg.sessionData.emitterMaxDistance > 0)    emitterMaxDistance    = msg.sessionData.emitterMaxDistance;
+
             //  Actualizamos el AddonsController con el environment correcto
             AddonsController addonsController = AddonsController.instance;
             if (addonsController != null)
             {
+                // El participante que se une puede no haber pasado por Options,
+                // por lo que environmentObjects puede estar vacío. Cargarlo ahora si es necesario.
+                if (addonsController.environmentObjects == null || addonsController.environmentObjects.Count == 0)
+                {
+                    Debug.Log("[SessionManager] environmentObjects vacío — cargando addons automáticamente para joining client.");
+                    addonsController.LoadAddonObjects();
+                }
+
+                bool envFound = false;
                 foreach (var envObject in addonsController.environmentObjects)
                 {
                     if (envObject.environmentName == msg.sessionData.environmentName)
                     {
                         addonsController.currentEnvironmentObject = envObject;
+                        envFound = true;
                         break;
                     }
                 }
+
+                // Si el addon no se encontró (p.ej. estaba disabled=false en addons.json para el
+                // joining client que nunca pasó por Options), intentar habilitarlo y recargar.
+                if (!envFound && addonsController.allAddonsData != null)
+                {
+                    foreach (Addon addon in addonsController.allAddonsData)
+                    {
+                        if (addon.addonType == "Environment" && addon.addonName == msg.sessionData.environmentName)
+                        {
+                            Debug.Log($"[SessionManager] Addon '{addon.addonName}' estaba desactivado. Habilitando para joining client...");
+                            addon.enabled = true;
+                            break;
+                        }
+                    }
+                    addonsController.LoadAddonObjects();
+                    foreach (var envObject in addonsController.environmentObjects)
+                    {
+                        if (envObject.environmentName == msg.sessionData.environmentName)
+                        {
+                            addonsController.currentEnvironmentObject = envObject;
+                            envFound = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (!envFound)
+                    Debug.LogError($"[SessionManager] El entorno '{msg.sessionData.environmentName}' no está disponible en este cliente. " +
+                                   "Verifica que los bundles estén en la carpeta Addons/Environment.");
             }
  
             //  Sincronizar categorías en CategoryController
@@ -701,19 +1093,28 @@ namespace Vortices
  
         private IEnumerator WaitForSessionDataAndLoadScene()
         {
- 
-            float timeout = 10f;
+            // 60 s: el examinador puede tardar en configurar la sesión Sala antes de lanzar.
+            // WaitForConnectionAndJoinSession reintenta RequestActiveSessionMessage cada 2 s mientras tanto.
+            float timeout = 60f;
             while (!sessionDataReceived && timeout > 0f)
             {
                 timeout -= Time.deltaTime;
                 yield return null;
             }
- 
+
             if (!sessionDataReceived)
             {
+                Debug.LogError("[SessionManager] Timeout (60 s) esperando datos de la sesión activa. " +
+                               "Verifica que el examinador haya creado la sesión y esté conectado al servidor.");
+                // Revelar la escena actual para que el usuario no quede en pantalla negra.
+                var tsF = SceneTransitionManager.instance;
+                if (tsF?.fadeScreen != null) tsF.fadeScreen.FadeIn();
+                joinSceneLoadCoroutine = null;
                 yield break;
             }
- 
+
+            // Limpiar referencia antes de cargar la escena
+            joinSceneLoadCoroutine = null;
             StartCoroutine(JoinSessionRoutine());
         }
  
@@ -741,6 +1142,28 @@ namespace Vortices
             List<AudioTargetMarker> markers = new List<AudioTargetMarker>();
             foreach (AudioTargetMarker m in allMarkers)
                 if (m != null && m.gameObject != null) markers.Add(m);
+
+            // Codigo para debug: listar todos los markers encontrados
+            // Genera AudioTargetMarkers dinámicos para Museum/Circular si hay menos markers que audios.
+            // Requiere un BoxCollider con tag "MuseumBounds" en la escena que defina el área válida.
+            if ((environmentName == "Museum" || environmentName == "Museum Environment" ||
+                 environmentName == "Circular" || environmentName == "Circular Environment") && markers.Count < paths.Count)
+            {
+                BoxCollider bounds = GameObject.FindGameObjectWithTag("MuseumBounds")?.GetComponent<BoxCollider>();
+                if (bounds == null)
+                    Debug.LogWarning("[SessionManager] Museum dynamic markers: no se encontró BoxCollider con tag 'MuseumBounds'.");
+
+                int toGenerate = paths.Count - markers.Count;
+                for (int i = 0; i < toGenerate; i++)
+                {
+                    Vector3 pos = GetRandomFloorPosition(bounds);
+                    GameObject go = new GameObject($"DynamicAudioMarker_{i}");
+                    AudioTargetMarker newMarker = go.AddComponent<AudioTargetMarker>();
+                    go.transform.position = pos;
+                    markers.Add(newMarker);
+                }
+                Debug.Log($"[SessionManager] Museum: generados {toGenerate} AudioTargetMarker dinámicos (total: {markers.Count}).");
+            }
 
             // Filtrar por tipo de objeto si el examinador eligió tipos específicos en el Step 3
             // (selectedObjectTypes vacío = todos los tipos son elegibles)
@@ -880,9 +1303,23 @@ namespace Vortices
                 Debug.LogWarning("[SessionManager] InfoPanel no encontrado — el botón Start no será habilitado.");
         }
 
+        // Nuevo metodo auxiliar para obtener una posición aleatoria válida en el piso dentro de unos límites definidos por un BoxCollider.
+        private Vector3 GetRandomFloorPosition(BoxCollider bounds)
+        {
+            if (bounds == null) return Vector3.zero;
+            Bounds b = bounds.bounds;
+            float x = Random.Range(b.min.x, b.max.x);
+            float z = Random.Range(b.min.z, b.max.z);
+            // Usar b.min.y como piso del área — evita raycast que golpea el techo del BoxCollider
+            return new Vector3(x, b.min.y + 0.1f, z);
+        }
+
         private IEnumerator LoadAudioClipCoroutine(string path, System.Action<AudioClip> onLoaded)
         {
-            string uri = "file:///" + path.Replace("\\", "/");
+            // Soporta rutas locales (file:///) Y URLs HTTP servidas por el Launcher online
+            string uri = (path.StartsWith("http://") || path.StartsWith("https://"))
+                ? path
+                : "file:///" + path.Replace("\\", "/");
             AudioType audioType = GetAudioTypeFromPath(path);
 
             using (UnityWebRequest req = UnityWebRequestMultimedia.GetAudioClip(uri, audioType))
@@ -918,32 +1355,78 @@ namespace Vortices
 
         private IEnumerator ConnectToVoiceChatCoroutine(int userId)
         {
+            // Guard: si Vivox no está inicializado, salir sin crashear
+            if (VivoxVoiceManager.Instance == null)
+            {
+                Debug.LogWarning("[VoiceChat] VivoxVoiceManager.Instance es NULL — Vivox no disponible, saltando conexión de voz.");
+                yield break;
+            }
+
             bool loginSuccess = false;
+            bool loginDone    = false;
+
+            // Intentar iniciar sesión en Vivox (con try-catch: LoginAsync puede lanzar internamente
+            // si Unity Services no está inicializado, aunque Instance no sea null)
+            try
+            {
+                VivoxVoiceManager.Instance.LoginAsync(userId.ToString()).ContinueWith(task =>
+                {
+                    loginSuccess = task.IsCompletedSuccessfully;
+                    if (!loginSuccess)
+                        Debug.LogWarning($"[VoiceChat] Login en Vivox falló: {task.Exception?.GetBaseException()?.Message}");
+                    loginDone = true;
+                });
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogWarning($"[VoiceChat] LoginAsync lanzó excepción: {ex.Message}. Saltando conexión de voz.");
+                yield break;
+            }
+
+            // Esperar login con timeout de 10 s (evita WaitUntil infinito si el task nunca termina)
+            float timeout = 10f;
+            while (!loginDone && timeout > 0f)
+            {
+                timeout -= Time.deltaTime;
+                yield return null;
+            }
+
+            if (!loginSuccess)
+            {
+                Debug.LogWarning("[VoiceChat] No se pudo hacer login en Vivox (timeout o error). Saltando conexión de voz.");
+                yield break;
+            }
+
             bool channelJoinSuccess = false;
- 
-            // Intentar iniciar sesión en Vivox
-            VivoxVoiceManager.Instance.LoginAsync(userId.ToString()).ContinueWith(task =>
+            bool channelJoinDone    = false;
+
+            // Intentar unirse al canal de voz (también con try-catch)
+            try
             {
-                if (task.IsCompletedSuccessfully)
+                VivoxVoiceManager.Instance.JoinChannelAsync("VoRTIcESVoiceChat").ContinueWith(task =>
                 {
-                    loginSuccess = true;
-                }
-            });
- 
-            // Esperar que el login termine
-            yield return new WaitUntil(() => loginSuccess);
- 
-            // Intentar unirse al canal de voz
-            VivoxVoiceManager.Instance.JoinChannelAsync("VoRTIcESVoiceChat").ContinueWith(task =>
+                    channelJoinSuccess = task.IsCompletedSuccessfully;
+                    if (!channelJoinSuccess)
+                        Debug.LogWarning($"[VoiceChat] Error al unirse al canal Vivox: {task.Exception?.GetBaseException()?.Message}");
+                    channelJoinDone = true;
+                });
+            }
+            catch (System.Exception ex)
             {
-                if (task.IsCompletedSuccessfully)
-                {
-                    channelJoinSuccess = true;
-                }
-            });
- 
-            // Esperar que se conecte al canal
-            yield return new WaitUntil(() => channelJoinSuccess);
+                Debug.LogWarning($"[VoiceChat] JoinChannelAsync lanzó excepción: {ex.Message}. Sin canal de voz.");
+                yield break;
+            }
+
+            // Esperar unión al canal con timeout de 10 s
+            timeout = 10f;
+            while (!channelJoinDone && timeout > 0f)
+            {
+                timeout -= Time.deltaTime;
+                yield return null;
+            }
+
+            if (!channelJoinSuccess)
+                Debug.LogWarning("[VoiceChat] No se pudo unir al canal Vivox (timeout o error).");
         }
  
         private IEnumerator DisconnectFromVivoxCoroutine()

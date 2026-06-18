@@ -223,24 +223,60 @@ public class AddonsController : MonoBehaviour
         {
             return;
         }
- 
+
         foreach (Addon addon in allAddonsData)
         {
             if (!addon.enabled)
             {
                 continue;
             }
- 
+
             if (addon.addonType == "Environment" && addon.addonName == currentEnvironmentObject.environmentName)
             {
                 string environmentBundlePaths = addonsPath + "/Environment";
                 string bundleName = "";
                 string bundlePath = "";
- 
+
                 // Scene
                 bundleName = addon.addonFileNames[1];
                 bundlePath = Path.Combine(environmentBundlePaths, bundleName);
                 currentEnvironmentObject.sceneBundle = AssetBundle.LoadFromFile(bundlePath);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Versión no-bloqueante de LoadEnvironmentScene().
+    /// Usa LoadFromFileAsync para que el hilo principal no se congele mientras se carga
+    /// el bundle de la escena (el bundle puede ser grande y bloquear >60 s en hardware lento,
+    /// lo que provoca el timeout KCP de Mirror y la pantalla negra en el cliente que se une).
+    /// </summary>
+    public IEnumerator LoadEnvironmentSceneAsync()
+    {
+        if (currentEnvironmentObject == null || currentEnvironmentObject.isBuiltIn)
+            yield break;
+
+        foreach (Addon addon in allAddonsData)
+        {
+            if (!addon.enabled) continue;
+
+            if (addon.addonType == "Environment" && addon.addonName == currentEnvironmentObject.environmentName)
+            {
+                string environmentBundlePaths = addonsPath + "/Environment";
+                string bundleName = addon.addonFileNames[1];
+                string bundlePath  = Path.Combine(environmentBundlePaths, bundleName);
+
+                Debug.Log($"[AddonsController] Cargando scene bundle (async): {bundlePath}");
+                AssetBundleCreateRequest request = AssetBundle.LoadFromFileAsync(bundlePath);
+                yield return request;   // cede el hilo → KCP sigue enviando keepalives
+
+                currentEnvironmentObject.sceneBundle = request.assetBundle;
+                if (currentEnvironmentObject.sceneBundle == null)
+                    Debug.LogError($"[AddonsController] No se pudo cargar el scene bundle: {bundlePath}");
+                else
+                    Debug.Log("[AddonsController] Scene bundle cargado (async) correctamente.");
+
+                yield break; // solo un entorno por sesión
             }
         }
     }

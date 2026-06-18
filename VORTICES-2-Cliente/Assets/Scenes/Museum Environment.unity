@@ -6269,7 +6269,7 @@ Mesh:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: pb_Mesh-96868
+  m_Name: pb_Mesh53454
   serializedVersion: 10
   m_SubMeshes:
   - serializedVersion: 2
@@ -14145,56 +14145,6 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 7874455298432362432, guid: 68726942979359a46b602cf32de1b7f0, type: 3}
   m_PrefabInstance: {fileID: 481436004}
   m_PrefabAsset: {fileID: 0}
---- !u!1 &482571427
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 482571428}
-  - component: {fileID: 482571429}
-  m_Layer: 0
-  m_Name: AudioSource_1
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &482571428
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 482571427}
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0.076, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 1674941311}
-  m_RootOrder: 0
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &482571429
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 482571427}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 2c216d2d01e86df408476b6272d3bbd4, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  roomIndex: 1
-  prefabType: 
-  labelDisplayName: 
-  audioFileName: 
-  userAudioSource: {fileID: 0}
-  furnitureLabel: {fileID: 0}
 --- !u!1001 &485415612
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -21518,7 +21468,7 @@ Mesh:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: pb_Mesh172168
+  m_Name: pb_Mesh55520
   serializedVersion: 10
   m_SubMeshes:
   - serializedVersion: 2
@@ -28363,56 +28313,6 @@ Light:
   m_UseViewFrustumForShadowCasterCull: 1
   m_ShadowRadius: 0
   m_ShadowAngle: 0
---- !u!1 &1144024482
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1144024483}
-  - component: {fileID: 1144024484}
-  m_Layer: 0
-  m_Name: AudioSource_2
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &1144024483
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1144024482}
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -2.11, y: 0.08, z: 3.401}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 1674941311}
-  m_RootOrder: 1
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &1144024484
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1144024482}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 2c216d2d01e86df408476b6272d3bbd4, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  roomIndex: 2
-  prefabType: 
-  labelDisplayName: 
-  audioFileName: 
-  userAudioSource: {fileID: 0}
-  furnitureLabel: {fileID: 0}
 --- !u!1 &1149084705
 GameObject:
   m_ObjectHideFlags: 0
@@ -33784,7 +33684,7 @@ Mesh:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: pb_Mesh170194
+  m_Name: pb_Mesh53400
   serializedVersion: 10
   m_SubMeshes:
   - serializedVersion: 2
@@ -34795,6 +34695,51 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 8615472127637941761, guid: c7141fcc28e512146a39b341e867c535, type: 3}
   m_PrefabInstance: {fileID: 2434243726876760439}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &1445965416
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1445965417}
+  - component: {fileID: 1445965418}
+  m_Layer: 0
+  m_Name: MuseumBounds
+  m_TagString: MuseumBounds
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1445965417
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1445965416}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0.018, z: -0.23}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_RootOrder: 9
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!65 &1445965418
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1445965416}
+  m_Material: {fileID: 0}
+  m_IsTrigger: 0
+  m_Enabled: 1
+  serializedVersion: 2
+  m_Size: {x: 20.98448, y: 10, z: 27.793446}
+  m_Center: {x: 0.33244038, y: 5, z: -0.5467663}
 --- !u!1 &1448508018 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 4268096341751905178, guid: 68726942979359a46b602cf32de1b7f0, type: 3}
@@ -44220,40 +44165,6 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1670674147}
   m_Mesh: {fileID: 2599794843794052647, guid: 463bff8d4d3eedd4c9696ebdcb82c4d6, type: 3}
---- !u!1 &1674941310
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1674941311}
-  m_Layer: 0
-  m_Name: AudioSources
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &1674941311
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1674941310}
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 10.649, y: 0.8614073, z: 5.248}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children:
-  - {fileID: 482571428}
-  - {fileID: 1144024483}
-  - {fileID: 2043834729}
-  m_Father: {fileID: 0}
-  m_RootOrder: 9
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1680367288
 GameObject:
   m_ObjectHideFlags: 0
@@ -51333,7 +51244,7 @@ Mesh:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: pb_Mesh-96876
+  m_Name: pb_Mesh56100
   serializedVersion: 10
   m_SubMeshes:
   - serializedVersion: 2
@@ -52116,56 +52027,6 @@ BoxCollider:
   serializedVersion: 2
   m_Size: {x: 0.10000235, y: 2.9999995, z: 4.7749977}
   m_Center: {x: -0.00000029616058, y: 1.5000699, z: -0.00000011920929}
---- !u!1 &2043834728
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 2043834729}
-  - component: {fileID: 2043834730}
-  m_Layer: 0
-  m_Name: AudioSource_3
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &2043834729
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2043834728}
-  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 4.173}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 1674941311}
-  m_RootOrder: 2
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &2043834730
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2043834728}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 2c216d2d01e86df408476b6272d3bbd4, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  roomIndex: 3
-  prefabType: 
-  labelDisplayName: 
-  audioFileName: 
-  userAudioSource: {fileID: 0}
-  furnitureLabel: {fileID: 0}
 --- !u!1001 &2044132774
 PrefabInstance:
   m_ObjectHideFlags: 0
