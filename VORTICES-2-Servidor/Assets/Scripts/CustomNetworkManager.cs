@@ -60,7 +60,12 @@ public class CustomNetworkManager : NetworkManager
     {
         Debug.Log($"[OnServerAddPlayer] Añadiendo jugador con connId: {conn.connectionId}...");
 
-        // Instanciar y añadir el jugador
+        // Instanciar y añadir el jugador (todos los entornos)
+        // NOTA Sala Environment: no tiene NetworkManager Start Positions en el Inspector
+        // → GetStartPosition() devuelve null → el prefab aparece en (0,0,0) = inicio del corredor.
+        // El jugador VR se mueve con el XR rig (posición independiente del prefab), pero
+        // el prefab sirve como indicador visual de presencia de cada cliente conectado.
+        // Para tracking de posición VR real se necesita un SalaNetworkHandler (trabajo futuro).
         Transform startPos = GetStartPosition();
         GameObject player = startPos != null
             ? Instantiate(playerPrefab, startPos.position, startPos.rotation)
@@ -70,18 +75,22 @@ public class CustomNetworkManager : NetworkManager
         Debug.Log("[OnServerAddPlayer] Jugador instanciado: " + player.name);
 
         NetworkServer.AddPlayerForConnection(conn, player);
+
+        // Sincronizar connId a todos los clientes vía SyncVar para que puedan
+        // renombrar el objeto y SalaNetworkHandler lo encuentre por nombre.
+        PlayerConnId connIdComp = player.GetComponent<PlayerConnId>();
+        if (connIdComp != null)
+            connIdComp.connId = conn.connectionId;
+        else
+            Debug.LogWarning("[OnServerAddPlayer] PlayerConnId no encontrado en el player prefab. Agrega el componente al prefab.");
         Debug.Log("[OnServerAddPlayer] Jugador añadido a la conexión del cliente.");
 
         // Buscar el ChatCanvas global
         GameObject chatCanvas = GameObject.FindWithTag("ChatCanvas");
         if (chatCanvas != null)
-        {
            Debug.Log("[ChatCanvas] Se encontró el ChatCanvas en el servidor.");
-        }
         else
-        {
             Debug.LogError("[ChatCanvas] No se encontró el ChatCanvas en el servidor.");
-        }
     }
 
 

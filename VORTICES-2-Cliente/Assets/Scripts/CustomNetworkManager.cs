@@ -15,6 +15,22 @@ public class CustomNetworkManager : NetworkManager
         Debug.Log("CustomNetworkManager - Awake");
     }
 
+    /// <summary>
+    /// Suprime el auto-Ready() + auto-AddPlayer() que Mirror llama al conectar.
+    /// Sin este override, Mirror crea el player-blob en Main Menu; al cargar Sala
+    /// (LoadSceneMode.Single) el blob se destruye y el servidor rechaza el segundo
+    /// AddPlayer porque conn.identity != null → el examinador queda sin blob.
+    /// LaunchSessionCoroutine y JoinSessionRoutine llaman Ready() + AddPlayer()
+    /// explícitamente DESPUÉS de que la escena de destino ya está cargada.
+    /// BORRAR ESTE OVERRIDE si causa problemas en Museum/Circular.
+    /// </summary>
+    public override void OnClientConnect()
+    {
+        Debug.Log("[CustomNetworkManager] OnClientConnect — sin auto-Ready/AddPlayer. " +
+                  "La coroutine de sesión los llamará tras cargar la escena.");
+        // NO llamar base.OnClientConnect() a propósito.
+    }
+
     public override void Start()
     {
         base.Start();

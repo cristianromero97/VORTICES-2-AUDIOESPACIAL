@@ -112,6 +112,45 @@ public class VivoxVoiceManager : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Une al usuario a un canal posicional 3D de Vivox.
+    /// El volumen se atenúa según la distancia entre jugadores.
+    /// Después de unirse, llamar periódicamente a UpdatePosition3D con la posición de la cámara.
+    /// </summary>
+    /// <param name="channelName">Nombre del canal posicional.</param>
+    /// <param name="audibleDistance">Distancia máxima de escucha (unidades de Unity). Por defecto 25.</param>
+    /// <param name="conversationalDistance">Distancia a la que se escucha al 100%. Por defecto 2.</param>
+    public async Task JoinPositionalChannelAsync(string channelName, int audibleDistance = 14, int conversationalDistance = 4)
+    {
+        try
+        {
+            var props = new Channel3DProperties(audibleDistance, conversationalDistance, 1.0f, AudioFadeModel.LinearByDistance);
+            await VivoxService.Instance.JoinPositionalChannelAsync(channelName, ChatCapability.AudioOnly, props);
+            Debug.Log($"[VivoxVoiceManager] Joined positional channel: {channelName} (audibleDist={audibleDistance}, convDist={conversationalDistance}).");
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"[VivoxVoiceManager] Failed to join positional channel '{channelName}': {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Actualiza la posición del oyente local en el canal posicional.
+    /// Debe llamarse periódicamente (ej. cada 0.1 s) mientras el canal posicional esté activo.
+    /// speakerPos y listenerPos son típicamente la misma posición (la cámara/cabeza del jugador).
+    /// </summary>
+    public void UpdatePosition3D(string channelName, Vector3 speakerPos, Vector3 listenerPos, Vector3 atOrient, Vector3 upOrient)
+    {
+        try
+        {
+            VivoxService.Instance.Set3DPosition(speakerPos, listenerPos, atOrient, upOrient, channelName);
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"[VivoxVoiceManager] Failed to update 3D position in '{channelName}': {ex.Message}");
+        }
+    }
+
     public async Task LeaveChannelAsync(string channelName)
     {
         try

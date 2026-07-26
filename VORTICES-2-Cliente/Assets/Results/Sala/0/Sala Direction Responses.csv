@@ -1,0 +1,5 @@
+sessionName,userId,soundFile,prefabType,roomIndex,direction,correct,timestamp
+Sala,0,Audio 3,80sTelevision,6,izquierda,True,2026-07-16 13:55:15
+Sala,0,Audio 4,80sTelevision,2,derecha,False,2026-07-16 13:55:38
+Sala,0,Audio 4,80sTelevision,2,derecha,False,2026-07-16 13:56:00
+Sala,0,Audio 6,80sTelevision,1,derecha,True,2026-07-20 18:10:02

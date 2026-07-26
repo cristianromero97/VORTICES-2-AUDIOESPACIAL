@@ -21,6 +21,8 @@ public struct SessionCreatedMessage : NetworkMessage
     // Sala Environment
     public int minRooms;
     public int maxRooms;
+    public int roomSeed; // Semilla de shuffle — garantiza misma asignación de audio en todos los clientes
+    public List<string> selectedObjectTypes; // Tipos de objeto que emitirán audio (vacío = todos)
     // Audio
     public int configLevel;
     // Perfil acústico override

@@ -70,18 +70,41 @@ namespace Vortices
                     yield break;
                 }
 
-                // Marcar que ya se ejecutó el auto-launch para que al volver
-                // al Main Menu tras finalizar sesión, LauncherBridge no vuelva a correr.
+                bool isJoinMode = config.isOnlineSession && (config.audioPaths == null || config.audioPaths.Count == 0);
+
                 hasAutoLaunched = true;
+                foreach (Canvas c in FindObjectsOfType<Canvas>()) c.enabled = false;
+                foreach (Camera cam in FindObjectsOfType<Camera>()) cam.enabled = false;
 
-                // Ocultar todo el Main Menu inmediatamente (UI + cámara)
-                // para que el usuario vea pantalla negra mientras se prepara la transición.
-                foreach (Canvas c in FindObjectsOfType<Canvas>())
-                    c.enabled = false;
-                foreach (Camera cam in FindObjectsOfType<Camera>())
-                    cam.enabled = false;
+                if (isJoinMode)
+                    ApplyJoinSessionConfig(sm, config);
+                else
+                    ApplySalaConfig(sm, config);
+            }
+            else if (config.targetEnvironment == "Museum" || config.targetEnvironment == "Circular")
+            {
+                if (string.IsNullOrEmpty(config.sessionName))
+                {
+                    Debug.LogWarning($"[LauncherBridge] targetEnvironment={config.targetEnvironment} pero sessionName vacío — flujo normal.");
+                    yield break;
+                }
 
-                ApplySalaConfig(sm, config);
+                // REVISAR Y BORRAR — detección antigua: solo miraba audioPaths, ignoraba elementPaths
+                // bool isJoinMode = config.isOnlineSession && (config.audioPaths == null || config.audioPaths.Count == 0);
+
+                // (fix añadido) JOIN = online sin audio Y sin elementos; examinador Museum puede no tener audio pero sí elementos
+                bool isJoinMode = config.isOnlineSession
+                    && (config.audioPaths  == null || config.audioPaths.Count  == 0)
+                    && (config.elementPaths == null || config.elementPaths.Count == 0);
+
+                hasAutoLaunched = true;
+                foreach (Canvas c in FindObjectsOfType<Canvas>()) c.enabled = false;
+                foreach (Camera cam in FindObjectsOfType<Camera>()) cam.enabled = false;
+
+                if (isJoinMode)
+                    ApplyJoinMuseumConfig(sm, config);
+                else
+                    ApplyMuseumConfig(sm, config);
             }
             else
             {
@@ -169,7 +192,6 @@ namespace Vortices
             sm.LaunchSession();
         }
 
-        // Solo inyecta config de audio — el usuario navega el menú VR normalmente
         private void ApplyAudioConfig(SessionManager sm, LauncherSessionConfig config)
         {
             sm.configLevel = Mathf.Clamp(config.configLevel, 1, 6);
@@ -188,14 +210,251 @@ namespace Vortices
                 ? new List<string>(config.audioPaths)
                 : new List<string>();
 
-            // Online: guardar IP del servidor para que SessionManager la use al conectar
             if (config.isOnlineSession)
             {
                 sm.isOnlineSession  = true;
                 sm.launcherServerIp = config.serverIpAddress;
             }
 
-            Debug.Log($"[LauncherBridge] Audio config inyectada (configLevel={sm.configLevel}, {sm.audioPaths.Count} archivos, online={config.isOnlineSession}).");
+            // Voz por proximidad: true = canal posicional Vivox, false = canal global
+            sm.proximityVoice = config.proximityVoice;
+
+            Debug.Log($"[LauncherBridge] Audio config inyectada (configLevel={sm.configLevel}, {sm.audioPaths.Count} archivos, online={config.isOnlineSession}, proximityVoice={config.proximityVoice}).");
+        }
+
+        private void ApplyMuseumConfig(SessionManager sm, LauncherSessionConfig config)
+        {
+            string envShort = config.targetEnvironment; // "Museum" o "Circular"
+            string envFull  = envShort + " Environment";
+
+            sm.sessionName     = config.sessionName;
+            sm.userId          = config.userId;
+            sm.environmentName = envShort;
+            sm.browsingMode    = config.isOnlineSession ? "Online" : "Local";
+            sm.displayMode     = envShort;
+            sm.isOnlineSession = config.isOnlineSession;
+
+            sm.elementPaths = config.elementPaths != null
+                ? new List<string>(config.elementPaths)
+                : new List<string>();
+
+            sm.selectedObjectTypes = new List<string>();
+
+            AddonsController addons = AddonsController.instance;
+            if (addons != null)
+            {
+                // FIX: en auto-launch nunca se pasa por SessionController.LoadEnvironments(),
+                // así que environmentObjects está vacío. Cargamos los addons aquí igual que
+                // hace HandleActiveSessionResponse para el cliente que se une.
+                if (addons.environmentObjects == null || addons.environmentObjects.Count == 0)
+                    addons.LoadAddonObjects();
+
+                bool found = false;
+                if (addons.environmentObjects != null)
+                {
+                    foreach (EnvironmentObject envObj in addons.environmentObjects)
+                    {
+                        if (envObj != null && envObj.environmentName == envFull)
+                        {
+                            addons.currentEnvironmentObject = envObj;
+                            found = true;
+                            break;
+                        }
+                    }
+                }
+
+                // Si el addon estaba desactivado en addons.json, forzarlo y recargar.
+                if (!found && addons.allAddonsData != null)
+                {
+                    foreach (Addon addon in addons.allAddonsData)
+                    {
+                        if (addon.addonType == "Environment" && addon.addonName == envFull)
+                        {
+                            Debug.Log($"[LauncherBridge] Addon '{addon.addonName}' desactivado → habilitando para auto-launch.");
+                            addon.enabled = true;
+                            break;
+                        }
+                    }
+                    addons.LoadAddonObjects();
+                    if (addons.environmentObjects != null)
+                    {
+                        foreach (EnvironmentObject envObj in addons.environmentObjects)
+                        {
+                            if (envObj != null && envObj.environmentName == envFull)
+                            {
+                                addons.currentEnvironmentObject = envObj;
+                                found = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                if (!found)
+                    Debug.LogError($"[LauncherBridge] No se encontró '{envFull}' en addons. Verifica que el bundle esté en Addons/Environment/.");
+            }
+
+            if (config.categories != null && config.categories.Count > 0)
+                PreWriteCategories(config.sessionName, config.userId, config.categories);
+
+            ApplyAudioConfig(sm, config);
+
+            Debug.Log($"[LauncherBridge] {envShort} auto-launch para '{config.sessionName}'.");
+            sm.LaunchSession();
+        }
+
+        private void PreWriteCategories(string sessionName, int userId, List<string> cats)
+        {
+            string path = System.IO.Path.Combine(Application.persistentDataPath, "Session categories.json");
+
+            CategoryController.CategorySaveData saveData;
+            if (System.IO.File.Exists(path))
+            {
+                try
+                {
+                    saveData = JsonUtility.FromJson<CategoryController.CategorySaveData>(
+                        System.IO.File.ReadAllText(path));
+                    saveData.allSessionCategory ??= new List<CategoryController.SessionCategory>();
+                }
+                catch { saveData = new CategoryController.CategorySaveData { allSessionCategory = new List<CategoryController.SessionCategory>() }; }
+            }
+            else
+            {
+                saveData = new CategoryController.CategorySaveData { allSessionCategory = new List<CategoryController.SessionCategory>() };
+            }
+
+            saveData.allSessionCategory.RemoveAll(s => s.sessionName == sessionName && s.userId == userId);
+
+            saveData.allSessionCategory.Add(new CategoryController.SessionCategory
+            {
+                sessionName          = sessionName,
+                userId               = userId,
+                categoriesList       = new List<string>(cats),
+                selectedCategoriesList = new List<string>()
+            });
+
+            System.IO.File.WriteAllText(path, JsonUtility.ToJson(saveData));
+            Debug.Log($"[LauncherBridge] Categorías pre-escritas para '{sessionName}': {string.Join(", ", cats)}");
+        }
+
+        private void ApplyJoinMuseumConfig(SessionManager sm, LauncherSessionConfig config)
+        {
+            string envShort = config.targetEnvironment; // "Museum" o "Circular"
+            string envFull  = envShort + " Environment";
+
+            sm.sessionName      = config.sessionName;
+            sm.userId           = config.userId;
+            sm.environmentName  = envShort;
+            sm.isOnlineSession  = true;
+            sm.launcherServerIp = config.serverIpAddress;
+            sm.browsingMode     = "Online";
+            sm.displayMode      = envShort;
+            sm.proximityVoice   = config.proximityVoice;
+
+            AddonsController addons = AddonsController.instance;
+            if (addons != null)
+            {
+                // FIX: mismo problema que ApplyMuseumConfig — environmentObjects vacío en auto-launch.
+                if (addons.environmentObjects == null || addons.environmentObjects.Count == 0)
+                    addons.LoadAddonObjects();
+
+                bool found = false;
+                if (addons.environmentObjects != null)
+                {
+                    foreach (EnvironmentObject envObj in addons.environmentObjects)
+                    {
+                        if (envObj != null && envObj.environmentName == envFull)
+                        {
+                            addons.currentEnvironmentObject = envObj;
+                            found = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (!found && addons.allAddonsData != null)
+                {
+                    foreach (Addon addon in addons.allAddonsData)
+                    {
+                        if (addon.addonType == "Environment" && addon.addonName == envFull)
+                        {
+                            Debug.Log($"[LauncherBridge] Addon '{addon.addonName}' desactivado → habilitando para JOIN auto-launch.");
+                            addon.enabled = true;
+                            break;
+                        }
+                    }
+                    addons.LoadAddonObjects();
+                    if (addons.environmentObjects != null)
+                    {
+                        foreach (EnvironmentObject envObj in addons.environmentObjects)
+                        {
+                            if (envObj != null && envObj.environmentName == envFull)
+                            {
+                                addons.currentEnvironmentObject = envObj;
+                                found = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                if (!found)
+                    Debug.LogError($"[LauncherBridge] No se encontró '{envFull}' en addons (JOIN). Verifica que el bundle esté en Addons/Environment/.");
+            }
+
+            Debug.Log($"[LauncherBridge] {envShort} JOIN para '{config.sessionName}', IP={config.serverIpAddress}.");
+            sm.JoinSession(config.serverIpAddress);
+        }
+
+        private void ApplyJoinSessionConfig(SessionManager sm, LauncherSessionConfig config)
+        {
+            // AÑADIDO: Setear datos mínimos necesarios para JOIN
+            sm.sessionName     = config.sessionName;
+            sm.userId          = config.userId;
+            sm.environmentName = "Sala";
+            sm.isOnlineSession = true;
+            sm.launcherServerIp = config.serverIpAddress;
+            sm.browsingMode = "Online";
+            sm.displayMode  = "Sala";
+            sm.minRooms     = config.minRooms;
+            sm.maxRooms     = config.maxRooms;
+
+            // Voz por proximidad: también aplica al participante que se une
+            sm.proximityVoice = config.proximityVoice;
+
+            Debug.Log($"[LauncherBridge]: Configuración JOIN aplicada (sessionName='{config.sessionName}', userId={config.userId}, online=true, serverIp={config.serverIpAddress}, proximityVoice={config.proximityVoice}).");
+
+            // AÑADIDO: Asegurar que AddonsController esté listo (mismo proceso que en ApplySalaConfig)
+            AddonsController addons = AddonsController.instance;
+            if (addons != null)
+            {
+                bool found = false;
+                if (addons.environmentObjects != null)
+                {
+                    foreach (EnvironmentObject envObj in addons.environmentObjects)
+                    {
+                        if (envObj != null && envObj.environmentName == "Sala Environment")
+                        {
+                            addons.currentEnvironmentObject = envObj;
+                            found = true;
+                            Debug.Log("[LauncherBridge] AÑADIDO: currentEnvironmentObject seteado a 'Sala Environment' (JOIN mode).");
+                            break;
+                        }
+                    }
+                }
+                if (!found)
+                {
+                    EnvironmentObject salaEnv = new EnvironmentObject();
+                    salaEnv.environmentName = "Sala Environment";
+                    salaEnv.isBuiltIn       = true;
+                    addons.currentEnvironmentObject = salaEnv;
+                    Debug.Log("[LauncherBridge] AÑADIDO: EnvironmentObject built-in creado para 'Sala Environment' (JOIN mode).");
+                }
+            }
+
+            // AÑADIDO: Llamar JoinSession en lugar de LaunchSession
+            Debug.Log("[LauncherBridge] AÑADIDO: Llamando sm.JoinSession() para unirse a sesión existente.");
+            sm.JoinSession(config.serverIpAddress);
         }
     }
 
@@ -216,7 +475,13 @@ namespace Vortices
         public int maxRooms = 10;
 
         // Step 2 - audio paths
-        public List<string> audioPaths = new List<string>();
+        public List<string> audioPaths    = new List<string>();
+
+        // Step 2b - element paths (Museum/Circular)
+        public List<string> elementPaths  = new List<string>();
+
+        // Categorías (Museum/Circular)
+        public List<string> categories    = new List<string>();
 
         // Step 4 - inmersión (aplica a todos los entornos)
         public int  configLevel         = 4;
@@ -240,5 +505,8 @@ namespace Vortices
         // Online
         public bool   isOnlineSession = false;
         public string serverIpAddress = "";
+
+        // Voz por proximidad: true = canal posicional Vivox (volumen según distancia), false = canal global
+        public bool proximityVoice = false;
     }
 }

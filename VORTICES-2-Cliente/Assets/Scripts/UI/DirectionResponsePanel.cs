@@ -16,7 +16,7 @@ namespace Vortices
         // ─────────────────────────────────────────────
         //  Estado
         // ─────────────────────────────────────────────
-        private enum PanelState { Selecting, ConfirmAnswer, Completed }
+        private enum PanelState { Selecting, ConfirmAnswer, Completed, Results }
 
         private PanelState        _state = PanelState.Selecting;
         private string            _selectedDirection;
@@ -46,6 +46,16 @@ namespace Vortices
         private GameObject        _completedSection;
         private Button            _repeatBtn;
         private Button            _finalizeBtn;
+
+        private GameObject        _resultsSection;
+        private TextMeshProUGUI   _answerResultText;
+        private TextMeshProUGUI   _explanationText;
+        private Button            _closeBtn;
+
+        // Datos calculados al Finalizar
+        private bool   _resultCorrect;
+        private string _resultCorrectDirection;
+        private int    _resultRoomIndex;
 
         // ─────────────────────────────────────────────
         //  Unity lifecycle
@@ -115,6 +125,7 @@ namespace Vortices
             _selectionSection.SetActive(s == PanelState.Selecting);
             _confirmSection.SetActive(s == PanelState.ConfirmAnswer);
             _completedSection.SetActive(s == PanelState.Completed);
+            _resultsSection.SetActive(s == PanelState.Results);
 
             switch (s)
             {
@@ -124,6 +135,11 @@ namespace Vortices
                     break;
                 case PanelState.Completed:
                     Select(_repeatBtn.gameObject);
+                    break;
+
+                case PanelState.Results:
+                    PopulateResults();
+                    Select(_closeBtn.gameObject);
                     break;
             }
         }
@@ -211,9 +227,46 @@ namespace Vortices
 
         private void OnFinalize()
         {
+            ComputeDirectionResult();
             LogResponse(_selectedDirection);
+            EnterState(PanelState.Results);
+        }
+
+        private void OnClose()
+        {
             SetVisible(false);
             _sonidosPanel?.OnDirectionResponded();
+        }
+
+        private void ComputeDirectionResult()
+        {
+            _resultRoomIndex       = _currentMarker?.roomIndex ?? -1;
+            _resultCorrectDirection = (_resultRoomIndex % 2 == 1) ? "DERECHA" : "IZQUIERDA";
+            _resultCorrect         = IsCorrectAnswer(_selectedDirection, _resultRoomIndex);
+        }
+
+        private void PopulateResults()
+        {
+            Color green = new Color(0.2f, 0.9f, 0.3f);
+            Color red   = new Color(1f,   0.3f, 0.3f);
+
+            string dirLower = _resultCorrectDirection.ToLower();
+
+            if (_resultCorrect)
+            {
+                _answerResultText.text  = $"Tu respuesta:  {_selectedDirection}\n✓ ¡Correcto!";
+                _answerResultText.color = green;
+                _explanationText.text   = $"El sonido provenía de la Sala {_resultRoomIndex}, " +
+                                          $"ubicada a la {_resultCorrectDirection} del corredor.";
+            }
+            else
+            {
+                _answerResultText.text  = $"Tu respuesta:  {_selectedDirection}\n✗  Incorrecto";
+                _answerResultText.color = red;
+                _explanationText.text   = $"El sonido provenía de la Sala {_resultRoomIndex}, " +
+                                          $"ubicada a la {_resultCorrectDirection} del corredor, " +
+                                          $"no a la {_selectedDirection.ToLower()}.";
+            }
         }
 
         // ─────────────────────────────────────────────
@@ -445,10 +498,41 @@ namespace Vortices
             _finalizeBtn.navigation = new Navigation
                 { mode = Navigation.Mode.Explicit, selectOnLeft  = _repeatBtn };
 
+            // ── Sección resultados ────────────────────
+            _resultsSection = MakeRect("ResultsSection", panel.transform);
+            AnchorRect(_resultsSection, 0.05f, 0f, 0.95f, 0.73f);
+
+            GameObject resTitleArea = MakeRect("TitleArea", _resultsSection.transform);
+            AnchorRect(resTitleArea, 0f, 0.85f, 1f, 1f);
+            MakeText("TitleText", resTitleArea.transform, "Resultado", 58f,
+                      FontStyles.Bold, TextAlignmentOptions.Center, Color.white, stretch: true);
+
+            GameObject answerArea = MakeRect("AnswerResult", _resultsSection.transform);
+            AnchorRect(answerArea, 0.04f, 0.55f, 0.96f, 0.83f);
+            MakeImage("AnswerBG", answerArea.transform, new Color(0.08f, 0.08f, 0.14f, 0.9f), stretch: true);
+            _answerResultText = MakeText("AnswerText", answerArea.transform, "", 48f,
+                                          FontStyles.Bold, TextAlignmentOptions.Center,
+                                          Color.white, stretch: true);
+            _answerResultText.overflowMode = TextOverflowModes.Overflow;
+
+            GameObject explanationArea = MakeRect("Explanation", _resultsSection.transform);
+            AnchorRect(explanationArea, 0.04f, 0.22f, 0.96f, 0.53f);
+            MakeImage("ExplBG", explanationArea.transform, new Color(0.08f, 0.08f, 0.14f, 0.9f), stretch: true);
+            _explanationText = MakeText("ExplText", explanationArea.transform, "", 46f,
+                                         FontStyles.Normal, TextAlignmentOptions.Center,
+                                         new Color(0.85f, 0.85f, 0.85f), stretch: true);
+            _explanationText.overflowMode = TextOverflowModes.Overflow;
+
+            GameObject closeArea = MakeRect("CloseArea", _resultsSection.transform);
+            AnchorRect(closeArea, 0.25f, 0.03f, 0.75f, 0.19f);
+            _closeBtn = BuildButton(closeArea.transform, "Cerrar", new Color(0.1f, 0.2f, 0.52f, 1f));
+            _closeBtn.onClick.AddListener(OnClose);
+
             // Todas las secciones ocultas al inicio
             _selectionSection.SetActive(false);
             _confirmSection.SetActive(false);
             _completedSection.SetActive(false);
+            _resultsSection.SetActive(false);
         }
 
         // ─────────────────────────────────────────────

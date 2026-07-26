@@ -18,6 +18,9 @@ public struct SessionData
     // Sala Environment
     public int minRooms; // N de salas (determina layout; RoomGeometry es determinista)
     public int maxRooms;
+    public int roomSeed; // Semilla para el shuffle de audio — garantiza misma asignacion en todos los clientes
+    public List<string> selectedObjectTypes; // Tipos de objeto que emitirán audio (vacío = todos)
+    public List<string> selectedDirections;  // (fix añadido) Direcciones activas (vacío = todas)
     // Audio
     public int configLevel; // Nivel de configuracion HRTF (se propaga a todos los participantes)
     // Perfil acústico override (aplanado — el servidor no tiene AudioManager)

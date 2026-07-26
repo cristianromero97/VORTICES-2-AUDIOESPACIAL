@@ -36,7 +36,7 @@ namespace Vortices
         // ─────────────────────────────────────────────
         //  Estado
         // ─────────────────────────────────────────────
-        private enum PanelState { Idle, Q1Room, ConfirmRoom, Q2Object, ConfirmObject, Completed }
+        private enum PanelState { Idle, Q1Room, ConfirmRoom, Q2Object, ConfirmObject, Completed, Results }
 
         public static SourceIdentificationPanel instance;
 
@@ -80,6 +80,17 @@ namespace Vortices
         private GameObject _completedSection;
         private Button     _repeatBtn;
         private Button     _finalizeBtn;
+
+        private GameObject      _resultsSection;
+        private TextMeshProUGUI _roomResultText;
+        private TextMeshProUGUI _objectResultText;
+        private Button          _closeBtn;
+
+        // Datos calculados al Finalizar
+        private bool   _resultCorrectRoom;
+        private bool   _resultCorrectObj;
+        private string _resultActualRoom;
+        private string _resultActualObject;
 
         // ─────────────────────────────────────────────
         //  Unity lifecycle
@@ -177,6 +188,7 @@ namespace Vortices
             _objectSection.SetActive(s == PanelState.Q2Object);
             _confirmSection.SetActive(s == PanelState.ConfirmRoom || s == PanelState.ConfirmObject);
             _completedSection.SetActive(s == PanelState.Completed);
+            _resultsSection.SetActive(s == PanelState.Results);
 
             switch (s)
             {
@@ -204,6 +216,11 @@ namespace Vortices
 
                 case PanelState.Completed:
                     Select(_repeatBtn.gameObject);
+                    break;
+
+                case PanelState.Results:
+                    PopulateResults();
+                    Select(_closeBtn.gameObject);
                     break;
             }
         }
@@ -402,11 +419,19 @@ namespace Vortices
         private void OnFinalize()
         {
             _answered.Add(_currentMarker);
-            _activeMarker = null;   // requiere nuevo Emitir para el próximo audio
+            _activeMarker = null;
+            ComputeResults();
             LogResponse();
+            EnterState(PanelState.Results);
+            Debug.Log("[SourceID] Actividad finalizada — mostrando resultados");
+        }
+
+        private void OnClose()
+        {
+            _answered.Remove(_currentMarker);
             SetVisible(false);
             _state = PanelState.Idle;
-            Debug.Log("[SourceID] Actividad finalizada — respuesta guardada en CSV");
+            Debug.Log("[SourceID] Resultados cerrados");
         }
 
         // ─────────────────────────────────────────────
@@ -425,6 +450,49 @@ namespace Vortices
             _group.interactable   = visible;
             _group.blocksRaycasts = visible;
             if (!visible) Select(null);
+        }
+
+        // ─────────────────────────────────────────────
+        //  Resultados
+        // ─────────────────────────────────────────────
+        private void ComputeResults()
+        {
+            string actualObject = _currentMarker?.labelDisplayName ?? _currentMarker?.prefabType ?? "?";
+            int    actualRoom   = _currentMarker?.roomIndex ?? -1;
+
+            _resultCorrectRoom   = int.TryParse(_roomAnswer, out int rInt) && rInt == actualRoom;
+            _resultCorrectObj    = string.Equals(_objectAnswer?.Trim(), actualObject.Trim(),
+                                                 System.StringComparison.OrdinalIgnoreCase);
+            _resultActualRoom    = actualRoom.ToString();
+            _resultActualObject  = actualObject;
+        }
+
+        private void PopulateResults()
+        {
+            Color green = new Color(0.2f, 0.9f, 0.3f);
+            Color red   = new Color(1f,   0.3f, 0.3f);
+
+            if (_resultCorrectRoom)
+            {
+                _roomResultText.text  = $"Sala: Sala {_roomAnswer}  ✓";
+                _roomResultText.color = green;
+            }
+            else
+            {
+                _roomResultText.text  = $"Sala: Sala {_roomAnswer}  ✗\n(era Sala {_resultActualRoom})";
+                _roomResultText.color = red;
+            }
+
+            if (_resultCorrectObj)
+            {
+                _objectResultText.text  = $"Objeto: {_objectAnswer}  ✓";
+                _objectResultText.color = green;
+            }
+            else
+            {
+                _objectResultText.text  = $"Objeto: {_objectAnswer}  ✗\n(era {_resultActualObject})";
+                _objectResultText.color = red;
+            }
         }
 
         // ─────────────────────────────────────────────
@@ -703,11 +771,42 @@ namespace Vortices
             _finalizeBtn.navigation = new Navigation
                 { mode = Navigation.Mode.Explicit, selectOnLeft  = _repeatBtn };
 
+            // ── Resultados ────────────────────────────────────
+            _resultsSection = MakeRect("ResultsSection", panel.transform);
+            AnchorRect(_resultsSection, 0.05f, 0.08f, 0.95f, 0.75f);
+
+            GameObject resTitleArea = MakeRect("TitleArea", _resultsSection.transform);
+            AnchorRect(resTitleArea, 0f, 0.82f, 1f, 1f);
+            MakeText("TitleText", resTitleArea.transform, "Resultados", 58f,
+                      FontStyles.Bold, TextAlignmentOptions.Center, Color.white, stretch: true);
+
+            GameObject roomResArea = MakeRect("RoomResult", _resultsSection.transform);
+            AnchorRect(roomResArea, 0.04f, 0.52f, 0.96f, 0.80f);
+            MakeImage("RoomBG", roomResArea.transform, new Color(0.08f, 0.08f, 0.14f, 0.9f), stretch: true);
+            _roomResultText = MakeText("RoomText", roomResArea.transform, "", 50f,
+                                        FontStyles.Bold, TextAlignmentOptions.Center,
+                                        Color.white, stretch: true);
+            _roomResultText.overflowMode = TextOverflowModes.Overflow;
+
+            GameObject objResArea = MakeRect("ObjResult", _resultsSection.transform);
+            AnchorRect(objResArea, 0.04f, 0.22f, 0.96f, 0.50f);
+            MakeImage("ObjBG", objResArea.transform, new Color(0.08f, 0.08f, 0.14f, 0.9f), stretch: true);
+            _objectResultText = MakeText("ObjText", objResArea.transform, "", 50f,
+                                          FontStyles.Bold, TextAlignmentOptions.Center,
+                                          Color.white, stretch: true);
+            _objectResultText.overflowMode = TextOverflowModes.Overflow;
+
+            GameObject closeArea = MakeRect("CloseArea", _resultsSection.transform);
+            AnchorRect(closeArea, 0.25f, 0.03f, 0.75f, 0.19f);
+            _closeBtn = BuildButton(closeArea.transform, "Cerrar", new Color(0.1f, 0.2f, 0.52f, 1f));
+            _closeBtn.onClick.AddListener(OnClose);
+
             // Todas las secciones ocultas al inicio
             _q1Section.SetActive(false);
             _objectSection.SetActive(false);
             _confirmSection.SetActive(false);
             _completedSection.SetActive(false);
+            _resultsSection.SetActive(false);
         }
 
         // ─────────────────────────────────────────────

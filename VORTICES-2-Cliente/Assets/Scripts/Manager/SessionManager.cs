@@ -31,6 +31,7 @@ namespace Vortices
         public int configLevel = 4;
         public int minRooms    = 1;
         public int maxRooms    = 50;
+        public int roomSeed    = 0; // Semilla generada por el examinador, distribuida a todos los clients vía SessionData
         public List<string> selectedObjectTypes = new List<string>();
         public bool hasAcousticOverride = false;
         public AudioManager.ProfileOverrideData acousticOverride;
@@ -46,6 +47,8 @@ namespace Vortices
         public float emitterMaxDistance    = 12f;
         // Radio (metros) para marcar labels de objetos cercanos como conflicto (rojo)
         public float proximityLabelRadius  = 1.5f;
+        // Voz por proximidad: true = canal posicional Vivox (volumen según distancia), false = global
+        public bool proximityVoice = false;
         // Environment Settings
         public string displayMode;
         public string browsingMode;
@@ -78,6 +81,10 @@ namespace Vortices
         // Referencias a las coroutines del flujo Join (para poder cancelarlas en reintentos)
         private Coroutine joinConnectionCoroutine;
         private Coroutine joinSceneLoadCoroutine;
+        // Canal de voz activo (varía si es normal o posicional)
+        private string activeVoiceChannelName = null;
+        // Coroutine que actualiza posición en canal posicional Vivox
+        private Coroutine positionUpdateCoroutine;
  
         public GameObject currentlySelected;
         public GameObject lastSelected;
@@ -181,7 +188,18 @@ namespace Vortices
             if (msg.emitterMinDistance > 0)    emitterMinDistance    = msg.emitterMinDistance;
             if (msg.emitterMaxDistance > 0)    emitterMaxDistance    = msg.emitterMaxDistance;
 
-            categoryController.UpdateCategoriesList(msg.categories);
+            // Tipos de objeto seleccionados por el examinador y semilla de shuffle.
+            // Crítico para que todos los clientes asignen audio a los MISMOS objetos.
+            if (msg.selectedObjectTypes != null && msg.selectedObjectTypes.Count > 0)
+                selectedObjectTypes = msg.selectedObjectTypes;
+            if (msg.roomSeed != 0)
+                roomSeed = msg.roomSeed;
+
+            // Sala no usa categorías y su flujo nunca llama Initialize() en CategoryController
+            // (sessionName queda null → Path.Combine lanza ArgumentNullException → Mirror desconecta).
+            // Para Museum/Circular sí se actualiza la lista normalmente.
+            if (environmentName != "Sala" && categoryController != null)
+                categoryController.UpdateCategoriesList(msg.categories ?? new List<string>());
         }
  
  
@@ -209,6 +227,33 @@ namespace Vortices
             {
                 lastSelected = EventSystem.current.currentSelectedGameObject;
             }
+
+            // AÑADIDO: Detectar tecla M para mutear/desmutear micrófono
+            if (Input.GetKeyDown(KeyCode.M))
+            {
+                ToggleMicrophone();
+            }
+
+            // AÑADIDO: Detectar Grip en Oculus Quest 2 para abrir/cerrar chat
+            // (Solo compila si OVRPlugin está disponible)
+#if OVRPLUGIN_ENABLED
+            try
+            {
+                if (OVRInput.GetDown(OVRInput.Button.PrimaryHandTrigger) || OVRInput.GetDown(OVRInput.Button.SecondaryHandTrigger))
+                {
+                    NewChatManager chatManager = FindObjectOfType<NewChatManager>();
+                    if (chatManager != null)
+                    {
+                        chatManager.ToggleChat();
+                        Debug.Log("[SessionManager] AÑADIDO: Grip detectado en VR - toggling chat.");
+                    }
+                }
+            }
+            catch
+            {
+                // OVRInput error - silenciar
+            }
+#endif
         }
 
         private void FindAndSetNextSelectable()
@@ -261,6 +306,82 @@ namespace Vortices
         #endregion
  
         #region Data Operations
+
+        // AÑADIDO: Variable para rastrear estado de micrófono
+        private bool isMicrophoneMuted = false;
+
+        // AÑADIDO: Entornos con chat habilitado
+        // Agregar/quitar entornos aquí para habilitar/deshabilitar chat
+        private static readonly List<string> ENVIRONMENTS_WITH_CHAT = new List<string> { "Sala", "Sala Environment" };
+        // Para habilitar chat en Museum: ENVIRONMENTS_WITH_CHAT.Add("Museum"); ENVIRONMENTS_WITH_CHAT.Add("Museum Environment");
+        // Para habilitar chat en Circular: ENVIRONMENTS_WITH_CHAT.Add("Circular"); ENVIRONMENTS_WITH_CHAT.Add("Circular Environment");
+
+        // AÑADIDO: Limpiar ChatCanvas si el entorno no tiene chat habilitado
+        private void CleanupChatIfNotEnabled()
+        {
+            if (!ENVIRONMENTS_WITH_CHAT.Contains(environmentName))
+            {
+                NewChatManager chatManager = FindObjectOfType<NewChatManager>();
+                if (chatManager != null)
+                {
+                    Debug.Log($"[SessionManager] AÑADIDO: Destruyendo ChatCanvas (entorno {environmentName} no tiene chat habilitado)");
+                    Destroy(chatManager.gameObject);
+                }
+            }
+        }
+
+        // AÑADIDO: Alternar muteo de micrófono
+        private void ToggleMicrophone()
+        {
+            isMicrophoneMuted = !isMicrophoneMuted;
+
+            // AÑADIDO: Si Vivox está disponible, aplicar el mute
+            if (VivoxVoiceManager.Instance != null)
+            {
+                try
+                {
+                    // Nota: Vivox API para mute puede variar. Este es un ejemplo de cómo sería.
+                    // Si VivoxService.Instance no tiene SetUserMuted(), usar otra API disponible.
+                    Debug.Log($"[SessionManager] AÑADIDO: Micrófono {(isMicrophoneMuted ? "MUTEADO" : "ACTIVADO")}");
+                    // TODO: Implementar según API disponible de Vivox (setUserMuted, setTransmissionMode, etc.)
+                }
+                catch (System.Exception ex)
+                {
+                    Debug.LogError($"[SessionManager] Error al aplicar mute en Vivox: {ex.Message}");
+                }
+            }
+            else
+            {
+                Debug.Log($"[SessionManager] AÑADIDO: Micrófono {(isMicrophoneMuted ? "MUTEADO" : "ACTIVADO")} (Vivox no disponible)");
+            }
+        }
+
+        // AÑADIDO: Inicializar Vivox para la sesión actual
+        private async void InitializeVivoxForSession()
+        {
+            if (VivoxVoiceManager.Instance == null)
+            {
+                Debug.LogError("[SessionManager] AÑADIDO: VivoxVoiceManager no encontrado.");
+                return;
+            }
+
+            try
+            {
+                // Login a Vivox con el userId
+                await VivoxVoiceManager.Instance.LoginAsync(userId.ToString());
+
+                // Unirse al canal de voz de la sesión (genérico para cualquier entorno)
+                string voiceChannelName = $"{environmentName}_{sessionName}";
+                await VivoxVoiceManager.Instance.JoinChannelAsync(voiceChannelName);
+
+                Debug.Log($"[SessionManager] AÑADIDO: Vivox inicializado - Usuario: {userId}, Canal: {voiceChannelName}");
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogError($"[SessionManager] AÑADIDO: Error inicializando Vivox - {ex.Message}");
+            }
+        }
+
         public void LaunchSession()
         {
             if (!sessionLaunchRunning)
@@ -315,6 +436,11 @@ namespace Vortices
                         }
                     }
  
+                    // Generar semilla de shuffle/posición de audio antes de enviar al servidor.
+                    // El joining client recibirá la misma semilla → mismo shuffle Y mismas posiciones
+                    // de AudioTargetMarkers dinámicos (Museum/Circular usan GetRandomFloorPosition con ella).
+                    roomSeed = UnityEngine.Random.Range(1, int.MaxValue);
+
                     SessionData sessionData = new SessionData
                     {
                         sessionName = sessionName,
@@ -326,10 +452,17 @@ namespace Vortices
                         browsingMode = "Online",
                         minRooms = minRooms,
                         maxRooms = maxRooms,
+                        roomSeed = roomSeed,
                         configLevel = configLevel
                     };
- 
+
                     yield return StartCoroutine(SendSessionDataToServer(sessionData));
+
+                    // Conectar a voz (original)
+                    if (sessionCreatedOnServer)
+                    {
+                        StartCoroutine(ConnectToVoiceChatCoroutine(userId));
+                    }
 
                     // Si el servidor no confirmó la sesión, NO cargar la escena.
                     // Esto evita que el examinador entre al entorno sin que el servidor tenga la sesión registrada.
@@ -357,6 +490,28 @@ namespace Vortices
 
                     // Un frame para que Start() de los objetos de la escena se ejecute
                     yield return null;
+
+                    // COMENTADO: Limpiar ChatCanvas - causa conflicto con EventSystem
+                    // CleanupChatIfNotEnabled();
+
+                    // Ready(): permite que el servidor envíe objetos spawneados (SalaNetworkHandler,
+                    // blobs de otros jugadores). Como OnClientConnect ya no auto-llama Ready(),
+                    // esta es la primera vez que se llama → el cliente estará not-ready aquí.
+                    if (NetworkClient.isConnected && !NetworkClient.ready)
+                    {
+                        Debug.Log("[LaunchSessionCoroutine] Llamando NetworkClient.Ready().");
+                        NetworkClient.Ready();
+                    }
+                    // AddPlayer(): crea el blob del examinador en la escena ya cargada (Sala Environment).
+                    // Llamarlo DESPUÉS de Ready() y en la escena correcta evita el bug donde el blob
+                    // se creaba en Main Menu y se destruía al cambiar de escena (Single mode).
+                    yield return null; // un frame para que Ready() se procese en el servidor
+                    if (NetworkClient.isConnected && NetworkClient.ready && NetworkClient.localPlayer == null)
+                    {
+                        Debug.Log("[LaunchSessionCoroutine] Llamando NetworkClient.AddPlayer() — creando blob del examinador en la escena actual.");
+                        NetworkClient.AddPlayer();
+                    }
+                    Debug.Log($"[LaunchSessionCoroutine] Escena cargada. NetworkClient.isConnected={NetworkClient.isConnected}, ready={NetworkClient.ready}, localPlayer={NetworkClient.localPlayer?.name ?? "null"}");
 
                     // Limpiar EventSystems duplicados tras cargar el bundle de la escena
                     var allES = FindObjectsOfType<UnityEngine.EventSystems.EventSystem>();
@@ -428,7 +583,7 @@ namespace Vortices
                             ? audioPaths
                             : elementPaths;
                         if (salaAudio != null && salaAudio.Count > 0)
-                            yield return StartCoroutine(AssignUserAudioCoroutine(salaAudio));
+                            yield return StartCoroutine(AssignUserAudioCoroutine(salaAudio, roomSeed));
                         else
                             Debug.LogWarning("[SessionManager] Sin rutas de audio para Sala (online). Verifica que hayas cargado archivos.");
                     }
@@ -448,14 +603,16 @@ namespace Vortices
                             Debug.LogWarning($"[SessionManager] AudioManager no encontrado en {targetEnvironment} (online).");
 
                         if (audioPaths != null && audioPaths.Count > 0)
-                            yield return StartCoroutine(AssignUserAudioCoroutine(audioPaths));
+                            yield return StartCoroutine(AssignUserAudioCoroutine(audioPaths, roomSeed));
                         else
                             Debug.LogWarning($"[SessionManager] audioPaths vacío en {targetEnvironment} (online). Carga audios desde Options.");
                     }
 
                     sessionLaunchRunning = false;
 
+                    // Conectar a voz (original)
                     StartCoroutine(ConnectToVoiceChatCoroutine(userId));
+
                     Debug.Log("Se envió la data al servidor.");
                     yield break;
                 }
@@ -560,6 +717,16 @@ namespace Vortices
 
             sessionCreatedOnServer = false; // reset antes de enviar
             Debug.Log($"[SessionManager] SendSessionDataToServer: enviando CreateSessionMessage (session='{sessionName}', env='{environmentName}', isOnline={isOnlineSession})...");
+            // Para Sala online: SalaPanel setea elementPaths (rutas locales), audioPaths queda vacío.
+            // Usar elementPaths como fallback SOLO para Sala.
+            // Para Museum/Circular: audioPaths vacío = sin audio (válido). NO usar elementPaths como
+            // fallback porque son image URLs, no rutas de audio → el joining client intentaría
+            // cargarlas como AudioClip y bloquearía JoinSessionRoutine sin motivo.
+            bool _isSalaEnv = environmentName == "Sala" || environmentName == "Sala Environment";
+            List<string> audioPathsToSend = (audioPaths != null && audioPaths.Count > 0)
+                ? audioPaths
+                : (_isSalaEnv ? (elementPaths ?? new List<string>()) : new List<string>());
+
             NetworkClient.Send(new CreateSessionMessage
             {
                 sessionName = sessionName,
@@ -572,9 +739,10 @@ namespace Vortices
                 dimension = dimension,
                 categories = categoryController.GetCategories(),
                 elementPaths = elementPaths,
-                audioPaths = audioPaths ?? new List<string>(),
+                audioPaths = audioPathsToSend,
                 minRooms = minRooms,
                 maxRooms = maxRooms,
+                roomSeed = roomSeed,
                 configLevel           = configLevel,
                 hasAcousticOverride   = hasAcousticOverride,
                 acousticSpatialBlend  = acousticOverride.spatialBlend,
@@ -586,7 +754,9 @@ namespace Vortices
                 emitterBaseVolume     = emitterBaseVolume,
                 emitterMinConfigLevel = emitterMinConfigLevel,
                 emitterMinDistance    = emitterMinDistance,
-                emitterMaxDistance    = emitterMaxDistance
+                emitterMaxDistance    = emitterMaxDistance,
+                selectedObjectTypes   = selectedObjectTypes ?? new List<string>(),
+                selectedDirections    = selectedDirections  ?? new List<string>()
             });
 
             // Esperar hasta 5 s a que el servidor confirme la sesión (HandleSessionCreatedMessage pone sessionCreatedOnServer = true)
@@ -703,6 +873,10 @@ namespace Vortices
             browsingMode = string.Empty;
             sessionDataReceived = false;      // Reset para que JoinSession pueda volver a esperar datos frescos
             sessionCreatedOnServer = false;   // Reset para que LaunchSession pueda volver a esperar confirmación del servidor
+            proximityVoice = false;
+            activeVoiceChannelName = null;
+            // La positionUpdateCoroutine ya fue detenida en DisconnectFromVivoxCoroutine
+            positionUpdateCoroutine = null;
 
             // Reiniciar controladores auxiliares si es necesario
             categoryController?.Initialize();
@@ -774,6 +948,9 @@ namespace Vortices
             // Un frame para que Start() de los objetos de la escena se ejecute
             yield return null;
 
+            // COMENTADO: Limpiar ChatCanvas - causa conflicto con EventSystem
+            // CleanupChatIfNotEnabled();
+
             // La escena del bundle puede traer su propio EventSystem → quedan 2 → input se congela.
             // Eliminar duplicados ahora que la escena ya cargó.
             var allEventSystems = FindObjectsOfType<UnityEngine.EventSystems.EventSystem>();
@@ -808,6 +985,15 @@ namespace Vortices
             {
                 Debug.Log("[JoinSessionRoutine] Llamando NetworkClient.Ready() para resincronizar objetos Mirror.");
                 NetworkClient.Ready();
+
+                // AddPlayer(): crea el blob del participante en la escena ya cargada.
+                // Como OnClientConnect ya no auto-llama AddPlayer(), hay que pedirlo aquí.
+                yield return null; // un frame para que el servidor procese Ready()
+                if (NetworkClient.ready && NetworkClient.localPlayer == null)
+                {
+                    Debug.Log("[JoinSessionRoutine] Llamando NetworkClient.AddPlayer() — creando blob del participante.");
+                    NetworkClient.AddPlayer();
+                }
             }
             else
             {
@@ -868,9 +1054,10 @@ namespace Vortices
             else Debug.LogWarning("[SessionManager] spawnController no encontrado (normal en Sala Environment).");
             inputController.RestartInputs();
 
-            // Sala online: asignar audio a los markers (audioPaths contiene URLs http:// del examiner)
+            // Sala online: asignar audio a los markers con la misma semilla que el examinador
+            // (roomSeed se recibió en HandleActiveSessionResponse → mismo shuffle → misma asignación)
             if (environmentName == "Sala Environment" && audioPaths != null && audioPaths.Count > 0)
-                yield return StartCoroutine(AssignUserAudioCoroutine(audioPaths));
+                yield return StartCoroutine(AssignUserAudioCoroutine(audioPaths, roomSeed));
 
             // Museum / Circular online: el joining client también debe escuchar el audio espacial.
             // audioPaths fue recibido del servidor via HandleActiveSessionResponse (mismo valor que el examiner).
@@ -887,14 +1074,14 @@ namespace Vortices
                 else
                     Debug.LogWarning($"[SessionManager] AudioManager no encontrado en {environmentName} (joining client).");
 
-                yield return StartCoroutine(AssignUserAudioCoroutine(audioPaths));
+                yield return StartCoroutine(AssignUserAudioCoroutine(audioPaths, roomSeed));
             }
             else if (audioPaths == null || audioPaths.Count == 0)
                 Debug.LogWarning($"[SessionManager] audioPaths vacío para joining client en {environmentName}. No se asigna audio.");
 
             sessionLaunchRunning = false;
 
-            // Conectar al canal de voz
+            // Conectar al canal de voz (original)
             Debug.Log("[DEBUG] Conectando al canal de voz...");
             StartCoroutine(ConnectToVoiceChatCoroutine(userId));
         }
@@ -918,12 +1105,16 @@ namespace Vortices
             }
 
             // Reintentar RequestActiveSessionMessage cada 2 s.
-            // Máximo 30 reintentos × 2 s = 60 s (igual al timeout de WaitForSessionDataAndLoadScene).
-            int maxRetries = 30;
+            // 150 reintentos × 2 s = 300 s (5 min): el examinador puede tardar en configurar
+            // los steps de Sala (selección de salas, archivos de audio, perfiles, etc.)
+            // antes de lanzar la sesión.
+            int maxRetries = 150;
             int retryCount = 0;
             while (!sessionDataReceived && NetworkClient.isConnected && retryCount < maxRetries)
             {
-                Debug.Log($"[SessionManager] RequestActiveSessionMessage — intento {retryCount + 1}/{maxRetries}...");
+                // Loguear solo cada 5 reintentos (cada 10 s) para no saturar el log
+                if (retryCount % 5 == 0)
+                    Debug.Log($"[SessionManager] RequestActiveSessionMessage — intento {retryCount + 1}/{maxRetries} (esperando sesión activa)...");
                 NetworkClient.Send(new RequestActiveSessionMessage());
                 retryCount++;
                 yield return new WaitForSeconds(2f);
@@ -998,6 +1189,14 @@ namespace Vortices
             //  Sala: sincronizar layout (RoomGeometry es determinista con el mismo minRooms)
             if (msg.sessionData.minRooms > 0) minRooms = msg.sessionData.minRooms;
             if (msg.sessionData.maxRooms > 0) maxRooms = msg.sessionData.maxRooms;
+            if (msg.sessionData.roomSeed  > 0) roomSeed = msg.sessionData.roomSeed;
+            // Tipos de objeto seleccionados por el examinador (vacío = todos elegibles).
+            // Crítico: AssignUserAudioCoroutine usa este valor para filtrar markers;
+            // si no se lee aquí el participante asigna audio a objetos distintos al examinador.
+            if (msg.sessionData.selectedObjectTypes != null && msg.sessionData.selectedObjectTypes.Count > 0)
+                selectedObjectTypes = msg.sessionData.selectedObjectTypes;
+            if (msg.sessionData.selectedDirections != null && msg.sessionData.selectedDirections.Count > 0)
+                selectedDirections = msg.sessionData.selectedDirections;
             //  Audio: sincronizar toda la configuración del examinador
             if (msg.sessionData.configLevel > 0) configLevel = msg.sessionData.configLevel;
             if (msg.sessionData.hasAcousticOverride)
@@ -1093,9 +1292,10 @@ namespace Vortices
  
         private IEnumerator WaitForSessionDataAndLoadScene()
         {
-            // 60 s: el examinador puede tardar en configurar la sesión Sala antes de lanzar.
+            // 300 s (5 min): el examinador puede tardar en configurar los steps de Sala
+            // (selección de salas, archivos de audio, perfiles acústicos, etc.) antes de lanzar.
             // WaitForConnectionAndJoinSession reintenta RequestActiveSessionMessage cada 2 s mientras tanto.
-            float timeout = 60f;
+            float timeout = 300f;
             while (!sessionDataReceived && timeout > 0f)
             {
                 timeout -= Time.deltaTime;
@@ -1104,7 +1304,7 @@ namespace Vortices
 
             if (!sessionDataReceived)
             {
-                Debug.LogError("[SessionManager] Timeout (60 s) esperando datos de la sesión activa. " +
+                Debug.LogError("[SessionManager] Timeout (300 s / 5 min) esperando datos de la sesión activa. " +
                                "Verifica que el examinador haya creado la sesión y esté conectado al servidor.");
                 // Revelar la escena actual para que el usuario no quede en pantalla negra.
                 var tsF = SceneTransitionManager.instance;
@@ -1121,7 +1321,13 @@ namespace Vortices
  
  
  
-        private IEnumerator AssignUserAudioCoroutine(List<string> paths = null)
+        /// <param name="paths">Rutas de audio a asignar. Si null, usa elementPaths.</param>
+        /// <param name="shuffleSeed">
+        /// Semilla para el shuffle determinista (System.Random, no afecta UnityEngine.Random).
+        /// -1 = aleatorio (modo offline o Museum/Circular donde no hay cross-client sync).
+        /// En Sala online el examinador genera la semilla y la distribuye a todos los clients.
+        /// </param>
+        private IEnumerator AssignUserAudioCoroutine(List<string> paths = null, int shuffleSeed = -1)
         {
             if (paths == null) paths = elementPaths;
 
@@ -1144,6 +1350,13 @@ namespace Vortices
                 if (m != null && m.gameObject != null) markers.Add(m);
 
             // Codigo para debug: listar todos los markers encontrados
+            // Crear RNG determinista aquí — se usa tanto para posiciones de markers dinámicos
+            // como para el shuffle posterior. shuffleSeed >= 0 → sesión online con semilla del examinador.
+            // Esto garantiza que examinador y participantes generen los MISMOS markers en las MISMAS posiciones.
+            System.Random rng = shuffleSeed >= 0
+                ? new System.Random(shuffleSeed)
+                : new System.Random();
+
             // Genera AudioTargetMarkers dinámicos para Museum/Circular si hay menos markers que audios.
             // Requiere un BoxCollider con tag "MuseumBounds" en la escena que defina el área válida.
             if ((environmentName == "Museum" || environmentName == "Museum Environment" ||
@@ -1156,7 +1369,8 @@ namespace Vortices
                 int toGenerate = paths.Count - markers.Count;
                 for (int i = 0; i < toGenerate; i++)
                 {
-                    Vector3 pos = GetRandomFloorPosition(bounds);
+                    // Usar rng sembrado para que todos los clientes generen las mismas posiciones
+                    Vector3 pos = GetRandomFloorPosition(bounds, rng);
                     GameObject go = new GameObject($"DynamicAudioMarker_{i}");
                     AudioTargetMarker newMarker = go.AddComponent<AudioTargetMarker>();
                     go.transform.position = pos;
@@ -1188,10 +1402,11 @@ namespace Vortices
                 yield break;
             }
 
-            // Shuffle aleatorio de los markers (Fisher-Yates) — distinta asignación cada sesión
+            // Shuffle Fisher-Yates con el mismo rng ya creado arriba (determinista si shuffleSeed >= 0).
+
             for (int i = markers.Count - 1; i > 0; i--)
             {
-                int j = Random.Range(0, i + 1);
+                int j = rng.Next(0, i + 1);
                 AudioTargetMarker tmp = markers[i];
                 markers[i] = markers[j];
                 markers[j] = tmp;
@@ -1304,12 +1519,22 @@ namespace Vortices
         }
 
         // Nuevo metodo auxiliar para obtener una posición aleatoria válida en el piso dentro de unos límites definidos por un BoxCollider.
-        private Vector3 GetRandomFloorPosition(BoxCollider bounds)
+        private Vector3 GetRandomFloorPosition(BoxCollider bounds, System.Random rng = null)
         {
             if (bounds == null) return Vector3.zero;
             Bounds b = bounds.bounds;
-            float x = Random.Range(b.min.x, b.max.x);
-            float z = Random.Range(b.min.z, b.max.z);
+            float x, z;
+            if (rng != null)
+            {
+                // RNG sembrado → posición determinista → misma en todos los clientes
+                x = (float)(rng.NextDouble() * (b.max.x - b.min.x) + b.min.x);
+                z = (float)(rng.NextDouble() * (b.max.z - b.min.z) + b.min.z);
+            }
+            else
+            {
+                x = UnityEngine.Random.Range(b.min.x, b.max.x);
+                z = UnityEngine.Random.Range(b.min.z, b.max.z);
+            }
             // Usar b.min.y como piso del área — evita raycast que golpea el techo del BoxCollider
             return new Vector3(x, b.min.y + 0.1f, z);
         }
@@ -1397,24 +1622,55 @@ namespace Vortices
                 yield break;
             }
 
+            // Elegir canal según modo de voz
+            // - Normal (global):     canal de grupo estándar, todos se escuchan igual
+            // - Proximidad (3D):     canal posicional, volumen según distancia al hablante
             bool channelJoinSuccess = false;
             bool channelJoinDone    = false;
 
-            // Intentar unirse al canal de voz (también con try-catch)
-            try
+            if (proximityVoice)
             {
-                VivoxVoiceManager.Instance.JoinChannelAsync("VoRTIcESVoiceChat").ContinueWith(task =>
+                // Canal posicional — nombre diferente para no mezclar usuarios en modos distintos
+                activeVoiceChannelName = "VoRTIcESVoiceChat_Positional";
+                Debug.Log($"[VoiceChat] Modo proximidad activo → uniendo a canal posicional '{activeVoiceChannelName}'.");
+
+                try
                 {
-                    channelJoinSuccess = task.IsCompletedSuccessfully;
-                    if (!channelJoinSuccess)
-                        Debug.LogWarning($"[VoiceChat] Error al unirse al canal Vivox: {task.Exception?.GetBaseException()?.Message}");
-                    channelJoinDone = true;
-                });
+                    VivoxVoiceManager.Instance.JoinPositionalChannelAsync(activeVoiceChannelName).ContinueWith(task =>
+                    {
+                        channelJoinSuccess = task.IsCompletedSuccessfully;
+                        if (!channelJoinSuccess)
+                            Debug.LogWarning($"[VoiceChat] Error al unirse al canal posicional Vivox: {task.Exception?.GetBaseException()?.Message}");
+                        channelJoinDone = true;
+                    });
+                }
+                catch (System.Exception ex)
+                {
+                    Debug.LogWarning($"[VoiceChat] JoinPositionalChannelAsync lanzó excepción: {ex.Message}. Sin canal de voz.");
+                    yield break;
+                }
             }
-            catch (System.Exception ex)
+            else
             {
-                Debug.LogWarning($"[VoiceChat] JoinChannelAsync lanzó excepción: {ex.Message}. Sin canal de voz.");
-                yield break;
+                // Canal de grupo estándar (comportamiento original)
+                activeVoiceChannelName = "VoRTIcESVoiceChat";
+                Debug.Log($"[VoiceChat] Modo global → uniendo a canal de grupo '{activeVoiceChannelName}'.");
+
+                try
+                {
+                    VivoxVoiceManager.Instance.JoinChannelAsync(activeVoiceChannelName).ContinueWith(task =>
+                    {
+                        channelJoinSuccess = task.IsCompletedSuccessfully;
+                        if (!channelJoinSuccess)
+                            Debug.LogWarning($"[VoiceChat] Error al unirse al canal Vivox: {task.Exception?.GetBaseException()?.Message}");
+                        channelJoinDone = true;
+                    });
+                }
+                catch (System.Exception ex)
+                {
+                    Debug.LogWarning($"[VoiceChat] JoinChannelAsync lanzó excepción: {ex.Message}. Sin canal de voz.");
+                    yield break;
+                }
             }
 
             // Esperar unión al canal con timeout de 10 s
@@ -1426,19 +1682,66 @@ namespace Vortices
             }
 
             if (!channelJoinSuccess)
+            {
                 Debug.LogWarning("[VoiceChat] No se pudo unir al canal Vivox (timeout o error).");
+            }
+            else if (proximityVoice)
+            {
+                // Iniciar la coroutine que envía la posición del jugador a Vivox cada 0.1 s
+                if (positionUpdateCoroutine != null) StopCoroutine(positionUpdateCoroutine);
+                positionUpdateCoroutine = StartCoroutine(UpdateVivoxPositionCoroutine(activeVoiceChannelName));
+                Debug.Log("[VoiceChat] Canal posicional unido. Actualizador de posición 3D iniciado.");
+            }
+        }
+
+        /// <summary>
+        /// Envía la posición y orientación de la cámara principal a Vivox cada 0.1 s.
+        /// Vivox usa estos datos para atenuar el volumen de los otros usuarios según distancia.
+        /// Solo activo cuando proximityVoice = true.
+        /// </summary>
+        private IEnumerator UpdateVivoxPositionCoroutine(string channelName)
+        {
+            var wait = new WaitForSeconds(0.1f);
+            while (true)
+            {
+                yield return wait;
+
+                if (VivoxVoiceManager.Instance == null) yield break;
+
+                Camera cam = Camera.main;
+                if (cam == null) continue; // La cámara puede no estar lista todavía
+
+                Vector3 pos = cam.transform.position;
+                Vector3 fwd = cam.transform.forward;
+                Vector3 up  = cam.transform.up;
+
+                // speakerPos == listenerPos: la "boca" y los "oídos" están en la misma posición (la cabeza del jugador)
+                VivoxVoiceManager.Instance.UpdatePosition3D(channelName, pos, pos, fwd, up);
+            }
         }
  
         private IEnumerator DisconnectFromVivoxCoroutine()
         {
             Debug.Log("[VoiceChat] Iniciando desconexión de Vivox...");
- 
+
+            // Detener actualizador de posición si estaba activo (canal posicional)
+            if (positionUpdateCoroutine != null)
+            {
+                StopCoroutine(positionUpdateCoroutine);
+                positionUpdateCoroutine = null;
+                Debug.Log("[VoiceChat] Actualizador de posición 3D detenido.");
+            }
+
             if (VivoxVoiceManager.Instance != null)
             {
-                // Salir del canal de voz
-                if (VivoxVoiceManager.LobbyChannelName != null)
+                // Salir del canal activo (normal o posicional según el modo usado)
+                string channelToLeave = !string.IsNullOrEmpty(activeVoiceChannelName)
+                    ? activeVoiceChannelName
+                    : VivoxVoiceManager.LobbyChannelName;
+
+                if (channelToLeave != null)
                 {
-                    Task leaveChannelTask = VivoxVoiceManager.Instance.LeaveChannelAsync(VivoxVoiceManager.LobbyChannelName);
+                    Task leaveChannelTask = VivoxVoiceManager.Instance.LeaveChannelAsync(channelToLeave);
                     yield return new WaitUntil(() => leaveChannelTask.IsCompleted);
  
                     if (leaveChannelTask.Exception != null)

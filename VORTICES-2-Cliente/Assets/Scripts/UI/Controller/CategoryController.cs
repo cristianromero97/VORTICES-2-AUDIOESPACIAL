@@ -92,6 +92,11 @@ namespace Vortices
 
         private void UpdateSessionCategoriesList(List<string> updatedCategoriesList)
         {
+            // GUARD — borrar si causó error en Museum/Circular.
+            // Sala omite Initialize() → allSessionCategory queda null → LINQ lanza
+            // ArgumentNullException que Mirror convierte en desconexión del cliente.
+            allSessionCategory ??= new List<SessionCategory>();
+
             SessionCategory oldSessionCategory = allSessionCategory.FirstOrDefault<SessionCategory>(session => session.sessionName == this.sessionName && session.userId == this.userId);
             if (oldSessionCategory != null)
             {
@@ -105,6 +110,9 @@ namespace Vortices
 
         private void UpdateSessionSelectedCategoriesList(List<string> updatedSelectedCategoriesList)
         {
+            // GUARD — borrar si causó error en Museum/Circular (ver comentario en UpdateSessionCategoriesList).
+            allSessionCategory ??= new List<SessionCategory>();
+
             SessionCategory oldSessionCategory = allSessionCategory.FirstOrDefault<SessionCategory>(session => session.sessionName == this.sessionName && session.userId == this.userId);
             if (oldSessionCategory != null)
             {
@@ -182,6 +190,10 @@ namespace Vortices
 
         public void SaveSessionCategoriesToRootFolder()
         {
+            // GUARD — borrar si causó error. Protege contra sessionName null cuando
+            // Initialize() no fue llamado (flujo Sala omite categoryController.Initialize()).
+            if (string.IsNullOrEmpty(sessionName)) return;
+
             string filename = Path.Combine(Application.dataPath + "/Results");
             // File path depends on session name and user Id
             filename = Path.Combine(filename, sessionName);

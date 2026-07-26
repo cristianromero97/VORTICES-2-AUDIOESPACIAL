@@ -9,12 +9,12 @@ namespace Vortices
         // Registro global de todos los markers activos en escena
         public static readonly List<AudioTargetMarker> All = new List<AudioTargetMarker>();
 
-        public int            roomIndex;
-        public string         prefabType;
+        public int            roomIndex;        // Índice de la habitación a la que pertenece este marker
+        public string         prefabType;       // Tipo de prefab (por ejemplo, "Chair", "Table", etc.)
         public string         labelDisplayName; // Nombre mostrado en el label (sin sufijo numérico)
         public string         audioFileName;    // Nombre del archivo sin extensión
-        public AudioSource    userAudioSource;
-        public FurnitureLabel furnitureLabel;
+        public AudioSource    userAudioSource;  // Referencia al AudioSource del usuario 
+        public FurnitureLabel furnitureLabel;   // Referencia al componente FurnitureLabel
 
         private void OnEnable()  { All.Add(this); }
         private void OnDisable() { All.Remove(this); }

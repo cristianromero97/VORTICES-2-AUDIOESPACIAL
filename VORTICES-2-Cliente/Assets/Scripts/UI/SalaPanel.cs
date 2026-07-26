@@ -5,6 +5,7 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 using SimpleFileBrowser;
+using Mirror;
  
 /// <summary>
 /// Pasos del flujo de configuración de Sala Environment.
@@ -874,6 +875,19 @@ namespace Vortices
             sessionManager.roomFilterIds  = roomFilterEnabled && roomFilterMode != 0
                 ? GetRoomFilterIds()
                 : new List<int>();
+
+            // Sincronizar isOnlineSession con el estado ACTUAL del toggle del menú principal.
+            // GoToCategoryConfig() lo seteó cuando el usuario presionó "Next", pero si el usuario
+            // activó/desactivó el toggle DESPUÉS de presionar "Next", el valor quedaría obsoleto.
+            // Leer SessionController.isOnlineMode aquí garantiza que se usa el estado más reciente.
+            SessionController sessionController = FindObjectOfType<SessionController>();
+            if (sessionController != null)
+                sessionManager.isOnlineSession = sessionController.isOnlineMode;
+
+            // Diagnóstico: confirmar modo online antes de lanzar
+            Debug.Log($"[SalaPanel] Lanzando sesión — isOnlineSession={sessionManager.isOnlineSession}, " +
+                      $"session='{sessionManager.sessionName}', env='{sessionManager.environmentName}', " +
+                      $"NetworkClient.isConnected={NetworkClient.isConnected}");
 
             sessionManager.LaunchSession();
         }

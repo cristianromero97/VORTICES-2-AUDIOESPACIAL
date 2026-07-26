@@ -1,0 +1,4 @@
+sessionName,userId,soundFile,actualObject,actualRoom,answeredRoom,answeredObject,correctRoom,correctObject,timestamp
+Sala,0,Audio 1,Television 2,8,2,Television 2,False,True,2026-07-16 13:49:13
+Sala,0,Audio 3,Television 1,6,3,Velador de noche,False,False,2026-07-16 13:51:49
+Sala,0,Audio 6,Television 2,1,4,Television 2,False,True,2026-07-20 18:08:52

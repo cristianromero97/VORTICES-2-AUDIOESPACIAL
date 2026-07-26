@@ -158,6 +158,8 @@ MonoBehaviour:
   syncInterval: 0.1
   museumBaseNetworkPrefab: {fileID: 3518092845463129470, guid: 41efbb882bc82ea409f4869e62ce4a36, type: 3}
   CircularNetworkPrefab: {fileID: 2997449883188453225, guid: 4cf04b7b09c0a1c48ab11583b2d8870e, type: 3}
+  SalaNetworkHandlerPrefab: {fileID: 3518092845463129470, guid: b1b8fb95f6abd204184e9a433b458388, type: 3}
+  ChatCanvasPrefab: {fileID: 8039182486620635618, guid: b7097add0faf9de419085d27da4d5341, type: 3}
 --- !u!114 &1164586096
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -239,7 +241,7 @@ MonoBehaviour:
   DualMode: 1
   NoDelay: 1
   Interval: 10
-  Timeout: 60000
+  Timeout: 300000
   FastResend: 2
   SendWindowSize: 4096
   ReceiveWindowSize: 4096
@@ -280,5 +282,6 @@ MonoBehaviour:
   - {fileID: 8039182486620635618, guid: b7097add0faf9de419085d27da4d5341, type: 3}
   - {fileID: 3518092845463129470, guid: 41efbb882bc82ea409f4869e62ce4a36, type: 3}
   - {fileID: 2997449883188453225, guid: 4cf04b7b09c0a1c48ab11583b2d8870e, type: 3}
+  - {fileID: 3518092845463129470, guid: b1b8fb95f6abd204184e9a433b458388, type: 3}
   timeInterpolationGui: 0
   chatCanvasPrefab: {fileID: 8039182486620635618, guid: b7097add0faf9de419085d27da4d5341, type: 3}

@@ -129,7 +129,7 @@ namespace Vortices
 
                     float radius = Mathf.Max(combined.extents.x, combined.extents.z);
                     pos = combined.center + fwd * (radius + 0.12f);
-                    pos.y = combined.center.y;
+                    pos.y = combined.max.y + 0.1f + heightOffset;
                 }
                 else
                 {

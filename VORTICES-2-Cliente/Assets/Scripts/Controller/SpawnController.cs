@@ -58,13 +58,15 @@ namespace Vortices
             }
 
             // Sala Environment: los emitters ya están configurados, no hay spawn base
-            if (sessionManager.environmentName == "Sala")
+            // Acepta tanto "Sala" (offline) como "Sala Environment" (online normalizado)
+            if (sessionManager.environmentName == "Sala" || sessionManager.environmentName == "Sala Environment")
             {
                 return;
             }
 
             // A fork for every environment possible
-            if (sessionManager.environmentName == "Circular")
+            // Acepta tanto la forma corta (offline) como la larga normalizada (online)
+            if (sessionManager.environmentName == "Circular" || sessionManager.environmentName == "Circular Environment")
             {
                 CircularSpawnBase spawnBase = null;
                 // A fork for every base compatible with environment
@@ -155,7 +157,7 @@ namespace Vortices
                 GameObject.Find("RightHand Controller").GetComponent<MoveGizmo>().enabled = true;
                 GameObject.Find("RightHand Controller").GetComponent<MoveGizmo>().Initialize(spawnBase);
             }
-            else if (sessionManager.environmentName == "Museum")
+            else if (sessionManager.environmentName == "Museum" || sessionManager.environmentName == "Museum Environment")
             {
                 // A fork for every base compatible with environment
                 if (sessionManager.displayMode == "Museum")

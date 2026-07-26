@@ -197,12 +197,25 @@ namespace Vortices
 
         private void OnEmitirClicked(SoundRow row)
         {
-            // Sesión online: enviar al servidor para que retransmita a todos
+            // Online: ejecutar la acción localmente (sin esperar relay de vuelta)
+            // y notificar al servidor para que retransmita a los DEMÁS clientes.
+            // El servidor excluye al emisor → nadie escucha doble.
             if (NetworkClient.isConnected &&
                 SessionManager.instance != null && SessionManager.instance.isOnlineSession)
             {
-                int idx = currentSrc == row.src ? -1 : rows.IndexOf(row);
-                NetworkClient.Send(new SonidosSyncMessage { audioIndex = idx });
+                if (currentSrc == row.src)
+                {
+                    // Toggle: ya estaba reproduciendo esta fila → silenciar
+                    StopCurrent();
+                    NetworkClient.Send(new SonidosSyncMessage { audioIndex = -1 });
+                }
+                else
+                {
+                    // Nueva fila: tocar localmente + avisar a los demás
+                    StopCurrent();
+                    PlayRow(row);
+                    NetworkClient.Send(new SonidosSyncMessage { audioIndex = rows.IndexOf(row) });
+                }
             }
             else
             {
