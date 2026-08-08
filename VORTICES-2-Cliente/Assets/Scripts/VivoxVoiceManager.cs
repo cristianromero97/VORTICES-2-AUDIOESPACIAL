@@ -2,7 +2,9 @@ using UnityEngine;
 using Unity.Services.Core;
 using Unity.Services.Vivox;
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
+using UnityEngine.XR;
 #if AUTH_PACKAGE_PRESENT
 using Unity.Services.Authentication;
 #endif
@@ -196,6 +198,74 @@ public class VivoxVoiceManager : MonoBehaviour
     bool CheckManualCredentials()
     {
         return !(string.IsNullOrEmpty(_issuer) && string.IsNullOrEmpty(_domain) && string.IsNullOrEmpty(_server));
+    }
+
+    // ─────────────────────────────────────────────
+    //  Mute de micrófono
+    // ─────────────────────────────────────────────
+
+    private bool _isMuted = false;
+    private bool _prevPrimaryLeft = false;
+    public bool IsMuted => _isMuted;
+
+    private void Update()
+    {
+        CheckMuteInput();
+    }
+
+    private void CheckMuteInput()
+    {
+        // Teclado: Ctrl+M
+        if (Input.GetKeyDown(KeyCode.M) && (Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl)))
+        {
+            ToggleMute();
+            return;
+        }
+
+        // VR: botón X (primaryButton controlador izquierdo)
+        var devices = new List<InputDevice>();
+        InputDevices.GetDevicesWithCharacteristics(
+            InputDeviceCharacteristics.Left | InputDeviceCharacteristics.Controller, devices);
+
+        if (devices.Count == 0) return;
+
+        devices[0].TryGetFeatureValue(CommonUsages.primaryButton, out bool pressed);
+        if (pressed && !_prevPrimaryLeft) ToggleMute();
+        _prevPrimaryLeft = pressed;
+    }
+
+    public void ToggleMute()
+    {
+        if (_isMuted) UnmuteMicrophone();
+        else MuteMicrophone();
+    }
+
+    public void MuteMicrophone()
+    {
+        try
+        {
+            VivoxService.Instance.MuteInputDevice();
+            _isMuted = true;
+            Debug.Log("[VivoxVoiceManager] Micrófono MUTEADO");
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"[VivoxVoiceManager] Error al mutear micrófono: {ex.Message}");
+        }
+    }
+
+    public void UnmuteMicrophone()
+    {
+        try
+        {
+            VivoxService.Instance.UnmuteInputDevice();
+            _isMuted = false;
+            Debug.Log("[VivoxVoiceManager] Micrófono ACTIVADO");
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"[VivoxVoiceManager] Error al desmutear micrófono: {ex.Message}");
+        }
     }
 
 }

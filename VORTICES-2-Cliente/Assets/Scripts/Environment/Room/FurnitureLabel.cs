@@ -15,7 +15,7 @@ namespace Vortices
         public static readonly List<FurnitureLabel> All = new List<FurnitureLabel>();
 
         // Radio (metros) al que el jugador debe estar para que el label revele el nombre real
-        public static float RevealRadius = 1.2f;
+        public static float RevealRadius = 2.0f;
 
         public int roomIndex { get; set; }
 
@@ -133,7 +133,7 @@ namespace Vortices
                 }
                 else
                 {
-                    pos = new Vector3(combined.center.x, combined.max.y + 0.25f + heightOffset, combined.center.z);
+                    pos = new Vector3(combined.center.x, combined.max.y + 0.5f + heightOffset, combined.center.z);
                 }
 
                 transform.position = pos;

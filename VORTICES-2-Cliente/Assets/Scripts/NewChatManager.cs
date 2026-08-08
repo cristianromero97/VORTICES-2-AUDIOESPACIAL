@@ -47,13 +47,10 @@ public class NewChatManager : NetworkBehaviour
 
         // AÑADIDO: Solo desactivar los elementos visuales si no es servidor, NO el Canvas completo
         // (si desactivamos el Canvas, Update() deja de ejecutarse y F2 no funciona)
-        if (!isServer)
-        {
-            if (chatInputField != null) chatInputField.gameObject.SetActive(false);
-            if (chatDisplay != null) chatDisplay.gameObject.SetActive(false);
-            if (sendButton != null) sendButton.gameObject.SetActive(false);
-            Debug.Log("[NewChatManager] AÑADIDO: Elementos visuales desactivados (no el Canvas).");
-        }
+        if (scrollRect != null) scrollRect.gameObject.SetActive(false);
+        if (chatInputField != null) chatInputField.gameObject.SetActive(false);
+        if (chatDisplay != null) chatDisplay.gameObject.SetActive(false);
+        if (sendButton != null) sendButton.gameObject.SetActive(false);
 
         Debug.Log($"[NewChatManager] AÑADIDO: Inicializado en: {gameObject.name}. Es servidor: {isServer}");
 
@@ -109,44 +106,44 @@ public class NewChatManager : NetworkBehaviour
         }
     }
 
-    // AÑADIDO: Detectar tecla F2 para alternar chat
+    // F2 (teclado) abre/cierra el chat — en VR usar botón B (HandController)
     private void Update()
     {
         if (Input.GetKeyDown(KeyCode.F2))
-        {
-            Debug.Log("[NewChatManager] AÑADIDO: Tecla F2 presionada, toggling chat.");
             ToggleChat();
-        }
     }
 
 
     public void ToggleChat()
     {
-        // AÑADIDO: Toggle los elementos visuales (no el Canvas completo)
         bool newState = false;
         if (chatInputField != null)
         {
             newState = !chatInputField.gameObject.activeSelf;
             chatInputField.gameObject.SetActive(newState);
 
-            // AÑADIDO: Abrir/cerrar keyboard junto con el chat
             if (newState)
             {
+                // Reposicionar frente al jugador al abrir
+                Camera cam = Camera.main;
+                if (cam != null)
+                {
+                    chatCanvas.transform.position = cam.transform.position + cam.transform.forward * 1.5f;
+                    chatCanvas.transform.rotation = Quaternion.LookRotation(cam.transform.forward);
+                }
+
                 chatInputField.ActivateInputField();
                 chatInputField.Select();
-                Debug.Log("[NewChatManager] AÑADIDO: Keyboard abierto con el chat.");
             }
             else
             {
                 chatInputField.DeactivateInputField();
                 EventSystem.current.SetSelectedGameObject(null);
-                Debug.Log("[NewChatManager] AÑADIDO: Keyboard cerrado con el chat.");
             }
         }
+        if (scrollRect != null) scrollRect.gameObject.SetActive(newState);
         if (chatDisplay != null) chatDisplay.gameObject.SetActive(newState);
         if (sendButton != null) sendButton.gameObject.SetActive(newState);
-
-        Debug.Log($"[NewChatManager] AÑADIDO: Chat {(newState ? "ACTIVADO" : "DESACTIVADO")}");
     }
 
     // Llamado cuando se presiona el botón de enviar
@@ -191,7 +188,6 @@ public class NewChatManager : NetworkBehaviour
         // Limpiar el campo de texto
         chatInputField.text = "";
     }
-
 
 
 

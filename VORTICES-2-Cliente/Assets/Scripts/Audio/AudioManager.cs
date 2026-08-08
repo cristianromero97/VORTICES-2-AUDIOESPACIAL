@@ -107,22 +107,12 @@ namespace Vortices
         [SerializeField, Min(0.01f)] private float oneShotMinDistance = 0.5f;
         [SerializeField, Min(0.01f)] private float oneShotMaxDistance = 12f;
      
-        [Header("Filtro por Sala (Opcional)")]
-        [Tooltip("Si está activo, solo sonarán emitters cuyos RoomId estén en la lista permitida.")]
-        [SerializeField] private bool filterEmittersByRoomId = false;
-     
-        [Tooltip("Habilita todas las salas de una vez, ignorando la lista de IDs. " +
-                 "Útil cuando tenés muchas salas y no querés cargarlas una por una.")]
-        [SerializeField] private bool enableAllRooms = true;
-     
-        [Tooltip("IDs de sala permitidos cuando el filtro está activo y enableAllRooms = false.")]
-        [SerializeField] private List<int> enabledRoomIds = new List<int>();
-     
         // ─────────────────────────────────────────────
         //  Estado interno
         // ─────────────────────────────────────────────
         private readonly List<SoundEmitter> registeredEmitters = new List<SoundEmitter>();
         private int currentLevel = 0;
+        private AudioRoomFilter roomFilter;
      
         /// <summary>Nivel de configuración auditiva actualmente aplicado (0–6).</summary>
         public int CurrentConfigLevel => currentLevel;
@@ -143,7 +133,8 @@ namespace Vortices
      
             if (persistAcrossScenes)
                 DontDestroyOnLoad(gameObject);
-     
+
+            roomFilter = GetComponent<AudioRoomFilter>();
             EnsureDefaultLevels();
         }
      
@@ -299,52 +290,42 @@ namespace Vortices
      
         private bool IsRoomEnabledForEmitter(SoundEmitter emitter)
         {
-            if (!filterEmittersByRoomId) return true;
-            if (emitter == null) return false;
-            if (enableAllRooms) return true;
-     
-            int id = emitter.RoomId;
-            return id > 0 && enabledRoomIds != null && enabledRoomIds.Contains(id);
+            if (roomFilter == null) return true;
+            return roomFilter.IsRoomEnabled(emitter);
         }
-     
-        /// <summary>Habilita todas las salas de una vez sin modificar la lista de IDs.</summary>
+
+        /// <summary>Habilita todas las salas de una vez. Delega en AudioRoomFilter si está presente.</summary>
         public void EnableAllRooms()
         {
-            enableAllRooms = true;
+            roomFilter?.EnableAllRooms();
             ApplyLevel(currentLevel);
         }
-     
-        /// <summary>
-        /// Habilita solo las salas indicadas. Desactiva enableAllRooms automáticamente.
-        /// </summary>
+
+        /// <summary>Habilita solo las salas indicadas. Delega en AudioRoomFilter si está presente.</summary>
         public void SetEnabledRooms(List<int> roomIds)
         {
-            enableAllRooms = false;
-            enabledRoomIds = roomIds ?? new List<int>();
+            roomFilter?.SetEnabledRooms(roomIds);
             ApplyLevel(currentLevel);
         }
-     
-        /// <summary>Activa o desactiva el filtro por sala. Si se desactiva, todas las salas suenan.</summary>
+
+        /// <summary>Activa o desactiva el filtro por sala. Delega en AudioRoomFilter si está presente.</summary>
         public void SetRoomFilterEnabled(bool enabled)
         {
-            filterEmittersByRoomId = enabled;
+            roomFilter?.SetRoomFilterEnabled(enabled);
             ApplyLevel(currentLevel);
         }
 
         /// <summary>Agrega una sala a la lista de habilitadas en runtime.</summary>
         public void EnableRoom(int roomId)
         {
-            enableAllRooms = false;
-            if (!enabledRoomIds.Contains(roomId))
-                enabledRoomIds.Add(roomId);
+            roomFilter?.EnableRoom(roomId);
             ApplyLevel(currentLevel);
         }
-     
+
         /// <summary>Quita una sala de la lista de habilitadas en runtime.</summary>
         public void DisableRoom(int roomId)
         {
-            enableAllRooms = false;
-            enabledRoomIds.Remove(roomId);
+            roomFilter?.DisableRoom(roomId);
             ApplyLevel(currentLevel);
         }
      

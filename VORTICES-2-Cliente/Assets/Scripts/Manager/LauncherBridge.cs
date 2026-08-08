@@ -224,7 +224,7 @@ namespace Vortices
 
         private void ApplyMuseumConfig(SessionManager sm, LauncherSessionConfig config)
         {
-            string envShort = config.targetEnvironment; // "Museum" o "Circular"
+            string envShort = config.targetEnvironment; // "Museum" 
             string envFull  = envShort + " Environment";
 
             sm.sessionName     = config.sessionName;

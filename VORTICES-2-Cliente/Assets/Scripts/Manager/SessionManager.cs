@@ -330,30 +330,11 @@ namespace Vortices
             }
         }
 
-        // AÑADIDO: Alternar muteo de micrófono
         private void ToggleMicrophone()
         {
-            isMicrophoneMuted = !isMicrophoneMuted;
-
-            // AÑADIDO: Si Vivox está disponible, aplicar el mute
             if (VivoxVoiceManager.Instance != null)
-            {
-                try
-                {
-                    // Nota: Vivox API para mute puede variar. Este es un ejemplo de cómo sería.
-                    // Si VivoxService.Instance no tiene SetUserMuted(), usar otra API disponible.
-                    Debug.Log($"[SessionManager] AÑADIDO: Micrófono {(isMicrophoneMuted ? "MUTEADO" : "ACTIVADO")}");
-                    // TODO: Implementar según API disponible de Vivox (setUserMuted, setTransmissionMode, etc.)
-                }
-                catch (System.Exception ex)
-                {
-                    Debug.LogError($"[SessionManager] Error al aplicar mute en Vivox: {ex.Message}");
-                }
-            }
-            else
-            {
-                Debug.Log($"[SessionManager] AÑADIDO: Micrófono {(isMicrophoneMuted ? "MUTEADO" : "ACTIVADO")} (Vivox no disponible)");
-            }
+                VivoxVoiceManager.Instance.ToggleMute();
+            isMicrophoneMuted = VivoxVoiceManager.Instance?.IsMuted ?? false;
         }
 
         // AÑADIDO: Inicializar Vivox para la sesión actual

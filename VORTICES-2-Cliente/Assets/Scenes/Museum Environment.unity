@@ -18550,23 +18550,23 @@ MonoBehaviour:
       serializedVersion: 2
       m_Curve:
       - serializedVersion: 3
-        time: 0.008090973
-        value: 1.001831
-        inSlope: 0
-        outSlope: 0
-        tangentMode: 0
+        time: 0.00039291382
+        value: 0.9997597
+        inSlope: -0.9994869
+        outSlope: -0.9994869
+        tangentMode: 34
         weightedMode: 0
-        inWeight: 0
-        outWeight: 0
+        inWeight: 0.33333334
+        outWeight: 0.33333334
       - serializedVersion: 3
-        time: 0.987854
-        value: 0.005317688
-        inSlope: 0
-        outSlope: 0
-        tangentMode: 0
+        time: 1.0004215
+        value: 0.0002441411
+        inSlope: -0.9994869
+        outSlope: -0.9994869
+        tangentMode: 34
         weightedMode: 0
-        inWeight: 0
-        outWeight: 0
+        inWeight: 0.33333334
+        outWeight: 0.33333334
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 0
@@ -18582,23 +18582,23 @@ MonoBehaviour:
       serializedVersion: 2
       m_Curve:
       - serializedVersion: 3
-        time: 0.008090973
-        value: 1.001831
-        inSlope: 0
-        outSlope: 0
-        tangentMode: 0
+        time: 0.00039291382
+        value: 0.9997597
+        inSlope: -0.9994869
+        outSlope: -0.9994869
+        tangentMode: 34
         weightedMode: 0
-        inWeight: 0
-        outWeight: 0
+        inWeight: 0.33333334
+        outWeight: 0.33333334
       - serializedVersion: 3
-        time: 0.987854
-        value: 0.005317688
-        inSlope: 0
-        outSlope: 0
-        tangentMode: 0
+        time: 1.0004215
+        value: 0.0002441411
+        inSlope: -0.9994869
+        outSlope: -0.9994869
+        tangentMode: 34
         weightedMode: 0
-        inWeight: 0
-        outWeight: 0
+        inWeight: 0.33333334
+        outWeight: 0.33333334
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 0
@@ -18609,9 +18609,6 @@ MonoBehaviour:
   outputMixerGroup: {fileID: 0}
   oneShotMinDistance: 0.5
   oneShotMaxDistance: 12
-  filterEmittersByRoomId: 0
-  enableAllRooms: 0
-  enabledRoomIds: 
 --- !u!4 &669002008
 Transform:
   m_ObjectHideFlags: 0

@@ -1,8 +1,5 @@
-using System;
-using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.Events;
 using UnityEngine.InputSystem;
 using UnityEngine.XR;
 using UnityEngine.XR.Interaction.Toolkit;
@@ -18,64 +15,75 @@ public class HandController : MonoBehaviour
     [SerializeField] InputActionProperty aPress;
     [SerializeField] InputActionProperty bPress;
 
-
+    private bool _prevSecondaryButton = false;
 
     private void Start()
     {
         righthandTools = FindObjectOfType<RighthandTools>();
 
-        if (righthandTools == null)
-        {
-            Debug.LogError("[HandController] No se encontró el script RightHandTools.");
-            return;
-        }
-
         if (bPress.action != null)
         {
-            bPress.action.started += OpenChat;
+            bPress.action.Enable();
+            bPress.action.started += OnBPress;
         }
 
-        if (aPress.action != null)
+        if (righthandTools != null && aPress.action != null)
         {
+            aPress.action.Enable();
             aPress.action.started += SelectElement;
         }
+    }
 
+    private void Update()
+    {
+        // Fallback XR hardware polling cuando bPress no está asignado en el Inspector
+        if (bPress.action == null)
+            CheckBButtonHardware();
+    }
+
+    private void CheckBButtonHardware()
+    {
+        var devices = new List<UnityEngine.XR.InputDevice>();
+        UnityEngine.XR.InputDevices.GetDevicesWithCharacteristics(
+            UnityEngine.XR.InputDeviceCharacteristics.Right | UnityEngine.XR.InputDeviceCharacteristics.Controller, devices);
+
+        if (devices.Count == 0) return;
+
+        devices[0].TryGetFeatureValue(UnityEngine.XR.CommonUsages.secondaryButton, out bool pressed);
+        if (pressed && !_prevSecondaryButton)
+            OpenChat();
+        _prevSecondaryButton = pressed;
     }
 
     private void OnDisable()
     {
-        if (aPress.action != null)
-        {
-            aPress.action.started -= SelectElement;
-        }
-
         if (bPress.action != null)
-        {
-            bPress.action.started -= OpenChat;
-        }
+            bPress.action.started -= OnBPress;
 
+        if (righthandTools != null && aPress.action != null)
+            aPress.action.started -= SelectElement;
     }
+
+    private void OnBPress(InputAction.CallbackContext context) => OpenChat();
 
     #region Controller Actions
 
-    // Select Actions
     public void SelectElement(InputAction.CallbackContext context)
     {
-        if(selectElement != null)
-        {
+        if (selectElement != null)
             selectElement.GetComponent<Element>().SelectElement();
-        }
     }
 
-    private void OpenChat(InputAction.CallbackContext context)
+    private void OpenChat()
     {
-        Debug.Log("[HandController] Botón B presionado: Abrir/Cerrar Chat.");
         if (righthandTools != null)
+            righthandTools.OnChatToggleChanged(true);
+        else
         {
-            righthandTools.OnChatToggleChanged(true); // Abre el chat
+            NewChatManager chatManager = FindObjectOfType<NewChatManager>(true);
+            chatManager?.ToggleChat();
         }
     }
 
     #endregion
-
 }
