@@ -208,6 +208,22 @@ public class VivoxVoiceManager : MonoBehaviour
     private bool _prevPrimaryLeft = false;
     public bool IsMuted => _isMuted;
 
+    public bool IsLocalSpeaking
+    {
+        get
+        {
+            try
+            {
+                if (VivoxService.Instance?.ActiveChannels == null) return false;
+                foreach (var participants in VivoxService.Instance.ActiveChannels.Values)
+                    foreach (var p in participants)
+                        if (p.IsSelf) return p.SpeechDetected;
+            }
+            catch { /* Vivox not yet connected */ }
+            return false;
+        }
+    }
+
     private void Update()
     {
         CheckMuteInput();
