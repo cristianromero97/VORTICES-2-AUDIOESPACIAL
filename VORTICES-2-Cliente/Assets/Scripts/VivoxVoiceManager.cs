@@ -92,7 +92,7 @@ public class VivoxVoiceManager : MonoBehaviour
 
         try
         {
-            await VivoxService.Instance.LoginAsync();
+            await VivoxService.Instance.LoginAsync(new LoginOptions { DisplayName = playerName }); // QUITAR EN CASO DE VOLVER A LA VERSION ANTERIOR: reemplazar por → await VivoxService.Instance.LoginAsync();
             Debug.Log($"Logged into Vivox as {playerName}.");
         }
         catch (Exception ex)

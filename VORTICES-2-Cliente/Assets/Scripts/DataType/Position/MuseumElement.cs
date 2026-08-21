@@ -99,6 +99,26 @@ namespace Vortices
             yield return StartCoroutine(DestroyObjectHandling());
             yield return StartCoroutine(ObjectLoad(forwards));
             yield return StartCoroutine(SpawnedObjectHandling());
+            SetupSpatialAudio(); // Enable spatial audio in gallery items; comment to revert to the previous version
+        }
+
+        // Sets up spatial audio for the museum element
+        // This method is responsible for configuring the spatial audio component associated with the museum element.
+        // To revert to the original version, remove this function along with the corresponding Museum file.
+        private void SetupSpatialAudio()
+        {
+            CanvasWebViewPrefab wv = GetComponentInChildren<CanvasWebViewPrefab>(true);
+            if (wv == null || wv.WebView == null) return;
+
+            MuseumElementSpatialAudio spatial = GetComponent<MuseumElementSpatialAudio>();
+            if (spatial == null)
+                spatial = gameObject.AddComponent<MuseumElementSpatialAudio>();
+
+            string currentPath = (elementPaths != null && elementPaths.Count > 0)
+                ? CircularList.GetElement<string>(elementPaths, globalIndex)
+                : "";
+
+            spatial.SetWebView(wv, currentPath);
         }
 
         // Destroys placement objects not needed and insert new ones at the same time

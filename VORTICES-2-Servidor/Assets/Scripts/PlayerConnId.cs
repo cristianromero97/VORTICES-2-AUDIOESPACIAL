@@ -12,6 +12,20 @@ public class PlayerConnId : NetworkBehaviour
     [SyncVar(hook = nameof(OnConnIdChanged))]
     public int connId = -1;
 
+    // QUITAR EN CASO DE VOLVER A LA VERSION ANTERIOR (eliminar también VivoxOcclusionManager.cs)
+    [SyncVar]
+    public int vivoxUserId = -1;
+
+    public override void OnStartLocalPlayer()
+    {
+        base.OnStartLocalPlayer();
+        var sm = Vortices.SessionManager.instance;
+        if (sm != null) CmdSetVivoxUserId(sm.userId);
+    }
+
+    [Command]
+    private void CmdSetVivoxUserId(int id) => vivoxUserId = id;
+
     private void OnConnIdChanged(int _, int newId)
     {
         if (newId < 0) return;

@@ -378,12 +378,19 @@ namespace Vortices
             block.transform.SetParent(parent, false);
             block.transform.localPosition = localPos;
             block.transform.localScale    = localScale;
- 
+
             if (mat != null)
             {
                 Renderer r = block.GetComponent<Renderer>();
                 if (r != null) r.sharedMaterial = mat;
             }
+
+            if (blockName.Contains("Wall") || blockName.Contains("Cap"))
+            {
+                int layer = LayerMask.NameToLayer("AudioOccluder");
+                if (layer >= 0) block.layer = layer;
+            }
+
             return block;
         }
  

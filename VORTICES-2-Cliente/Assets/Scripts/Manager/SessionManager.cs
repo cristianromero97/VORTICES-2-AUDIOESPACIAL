@@ -1672,6 +1672,12 @@ namespace Vortices
                 if (positionUpdateCoroutine != null) StopCoroutine(positionUpdateCoroutine);
                 positionUpdateCoroutine = StartCoroutine(UpdateVivoxPositionCoroutine(activeVoiceChannelName));
                 Debug.Log("[VoiceChat] Canal posicional unido. Actualizador de posición 3D iniciado.");
+
+                // QUITAR EN CASO DE VOLVER A LA VERSION ANTERIOR
+                var occlusionGO = new GameObject("VivoxOcclusionManager");
+                DontDestroyOnLoad(occlusionGO);
+                var occlusion = occlusionGO.AddComponent<VivoxOcclusionManager>();
+                occlusion.Init(activeVoiceChannelName);
             }
         }
 
